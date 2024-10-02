@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum SatuSehatRole {
+  Admin
+  User
+  Doctor
+  Nurse
+  Pharmacist
+  PatientRegistration
+  MedicalStaff
+  LabTechnician
+  Radiologist
+  Nutritionist
+  Physiotherapist
+  MidWife
+  Dentist
+  Psychologist
+  MedicalRecordStaff
+  EmergencyStaff
+  Anesthesiologist
+  Cardiologist
+  Pediatrician
+  Surgeon
+  PublicHealthOfficer
+  HealthEducator
+  QualityAssuranceOfficer
+  ResearchStaff
+  ITSupport
+}
+
+enum BPJSRole {
+  Admin
+  User
+  InsuranceAgent
+  ClaimProcessor
+  FinanceOfficer
+  CustomerService
+  UnderwritingOfficer
+  ActuarialStaff
+  LegalOfficer
+  ComplianceOfficer
+  MarketingStaff
+  ProductDevelopmentStaff
+  RiskManagementOfficer
+  AuditStaff
+  HumanResourceStaff
+  ITSupport
+}
+
+
+enum JenisKelamin {
+  male
+  female
+}
+
+enum Agama {
+  Islam
+  Kristen
+  Hindu
+  Buddha
+  Khatolik
+}
+
+enum Kewarganegaraan {
+  WNA
+  WNI
+}
+
+model User {
+  id String @id @default(cuid())
+  name String
+  email String @unique
+  password String
+  satuSehatRole SatuSehatRole?
+  bpjsRole BPJSRole?
+  accessToken String?
+  refreshToken String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Patient {
+  id String @id @default(cuid())
+  nik String @unique
+  nama String
+  tempatLahir String
+  tanggalLahir DateTime
+  jenisKelamin JenisKelamin
+  alamat String
+  provinsi String
+  kota String
+  daerah String
+  kecamatan String
+}
