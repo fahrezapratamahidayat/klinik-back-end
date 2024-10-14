@@ -1,10 +1,14 @@
 import { Application, Router } from "express";
-import { PatientRoutes } from "./patient-routes";
+import { LocationRoutes } from "./location-routes";
 import { MainRouter } from "./main-route";
+import { AdminRoutes } from "./admin-routes";
+import { PendaftaranRoutes } from "./pendaftaran-routes";
 
 const _routes: Array<[string, Router]> = [
     ['/', MainRouter],
-    ['/api/patient', PatientRoutes]
+    ['/api/pendaftaran', PendaftaranRoutes],
+    ['/api/admin', AdminRoutes],
+    ['/api/location', LocationRoutes]
 ]
 
 export const routes = (app: Application) => {
