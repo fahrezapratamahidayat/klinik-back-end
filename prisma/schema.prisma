@@ -13,97 +13,453 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-enum SatuSehatRole {
+enum KlinikRole {
   Admin
-  User
-  Doctor
-  Nurse
-  Pharmacist
-  PatientRegistration
-  MedicalStaff
-  LabTechnician
-  Radiologist
-  Nutritionist
-  Physiotherapist
-  MidWife
-  Dentist
-  Psychologist
-  MedicalRecordStaff
-  EmergencyStaff
-  Anesthesiologist
-  Cardiologist
-  Pediatrician
-  Surgeon
-  PublicHealthOfficer
-  HealthEducator
-  QualityAssuranceOfficer
-  ResearchStaff
-  ITSupport
+  Pendaftaran
+  Perawat
+  Dokter
+  Farmasi
+  Kasir
+  Pengguna
 }
 
-enum BPJSRole {
-  Admin
-  User
-  InsuranceAgent
-  ClaimProcessor
-  FinanceOfficer
-  CustomerService
-  UnderwritingOfficer
-  ActuarialStaff
-  LegalOfficer
-  ComplianceOfficer
-  MarketingStaff
-  ProductDevelopmentStaff
-  RiskManagementOfficer
-  AuditStaff
-  HumanResourceStaff
-  ITSupport
-}
-
-
-enum JenisKelamin {
+enum Gender {
   male
   female
 }
 
-enum Agama {
-  Islam
-  Kristen
-  Hindu
-  Buddha
-  Khatolik
+enum MaritalStatus {
+  S /// Single
+  M /// Married
+  W /// Widowed
+  D /// Divorced
 }
 
-enum Kewarganegaraan {
-  WNA
-  WNI
+enum CitizenshipStatus {
+  wni /// Warga Negara Indonesia
+  wna /// Warga Negara Asing
 }
 
-model User {
-  id String @id @default(cuid())
-  name String
-  email String @unique
-  password String
-  satuSehatRole SatuSehatRole?
-  bpjsRole BPJSRole?
-  accessToken String?
-  refreshToken String?
+enum IdentifierType {
+  nik /// Nomor Induk Kependudukan
+  nik_ibu /// Nomor Induk Kependudukan Ibu
+  tanpa_nik /// Tanpa NIK
+}
+
+enum RelationshipType {
+  orang_tua /// Orang Tua
+  anak /// Anak
+  pasangan /// Pasangan
+  saudara /// Saudara
+  kakek_nenek /// Kakek/Nenek
+  cucu /// Cucu
+  lainnya /// Lainnya
+}
+
+enum BloodType {
+  a /// A
+  b /// B
+  ab /// AB
+  o /// O
+  tidak_tahu /// Tidak Tahu
+}
+
+enum Education {
+  sd /// Sekolah Dasar
+  smp /// Sekolah Menengah Pertama
+  sma /// Sekolah Menengah Atas
+  d3 /// Diploma Tiga
+  s1 /// Sarjana Satu
+  s2 /// Sarjana Dua
+  s3 /// Sarjana Tiga
+}
+
+enum Religion {
+  islam /// Islam
+  kristen /// Kristen
+  katolik /// Katolik
+  hindu /// Hindu
+  budha /// Budha
+  konghucu /// Konghucu
+  lainnya /// Lainnya
+}
+
+enum TelecomUse {
+  home /// Rumah
+  work /// Kerja
+  temp /// Sementara
+  old /// Lama
+  mobile /// Ponsel
+  other /// Lainnya
+}
+
+enum TelecomSystem {
+  phone /// Telepon
+  email /// Email
+  other /// Lainnya
+}
+
+enum DoctorStatus {
+  aktif /// Aktif
+  tidak_aktif /// Tidak Aktif
+  cuti /// Cuti
+}
+
+enum TindakanType {
+  BEDAH /// Bedah
+  PEMERIKSAAN /// Pemeriksaan
+  TERAPI /// Terapi
+  DIAGNOSTIK /// Diagnostik
+  LAINNYA /// Lainnya
+}
+
+enum RoomStatus {
+  active /// Ruangan aktif dan dapat digunakan
+  inactive /// Ruangan tidak aktif sementara
+  suspended /// Ruangan ditangguhkan penggunaannya
+}
+
+enum ServiceClass {
+  vvip /// Very Important Person (Orang Penting)
+  vip /// Important Person (Orang Penting)
+  kelas_1 /// Kelas 1
+  kelas_2 /// Kelas 2
+  kelas_3 /// Kelas 3
+  non_kelas /// Untuk ruangan tanpa klasifikasi kelas
+}
+
+enum Installation {
+  rawat_inap /// Rawat Inap
+  rawat_jalan /// Rawat Jalan
+  gawat_darurat /// Gawat Darurat
+  bedah_sentral /// Bedah Sentral
+  laboratorium /// Laboratorium
+  radiologi /// Radiologi
+  farmasi /// Farmasi
+  rehabilitasi_medik /// Rehabilitasi Medik
+  hemodialisis /// Hemodialisis
+  icu /// Intensive Care Unit (Unit Intensif)
+  nicu /// Neonatal Intensive Care Unit (Unit Intensif Neonatal)
+  picu /// Pediatric Intensive Care Unit (Unit Intensif Pediatrik)
+  LAINNYA /// Untuk instalasi yang tidak tercantum
+}
+
+enum PhysicalType {
+  bu /// Building (Gedung)
+  wi /// Wing (Sayap)
+  co /// Corridor (Koridor)
+  ro /// Room (Ruangan)
+  bd /// Bed (Tempat Tidur)
+  ve /// Vehicle (Kendaraan)
+  ho /// House (Rumah)
+  ca /// Cabinet (Lemari)
+  rd /// Road (Jalan)
+  area /// Area
+}
+
+enum OperationalStatus {
+  C /// Closed (Tutup)
+  H /// Housekeeping (Pembersihan)
+  I /// Isolated (Terisolasi)
+  K /// Contaminated (Terkontaminasi)
+  O /// Occupied (Terisi)
+  U /// Unoccupied (Kosong)
+}
+
+enum UseRoom {
+  usual /// Ruangan yang biasa digunakan
+  official /// Ruangan yang digunakan untuk keperluan resmi
+  temporary /// Ruangan yang digunakan sementara
+  secondary /// Ruangan yang digunakan sebagai tempat lain setelah menggunakan ruangan utama
+  old /// Ruangan yang sudah tidak digunakan lagi
+}
+
+enum LocationMode {
+  instance /// Instalasi
+  kind /// Jenis
+}
+
+enum LocationType {
+  site /// Lokasi
+  building /// Gedung
+  wing /// Sayap
+  ward /// Ruangan
+  level /// Lantai
+  room /// Ruangan
+  bed /// Tempat Tidur
+  vehicle /// Kendaraan
+  house /// Rumah
+  cabinet /// Lemari
+  road /// Jalan
+  area /// Area
+  jurisdiction /// Wilayah
+}
+
+enum RegistrationStatus {
+  draft
+  dalam_antrian
+  antrian_perawat
+  dalam_pemeriksaan_perawat
+  antrian_dokter
+  dalam_pemeriksaan_dokter
+  antrian_farmasi
+  dalam_antrian_farmasi
+  antrian_kasir
+  dalam_antrian_kasir
+  selesai
+  cancel
+}
+
+// ------------------------------
+// 1. ADMIN
+// ------------------------------
+model Doctor {
+  id                  String                @id @default(uuid())
+  name                String
+  gender              Gender
+  birthDate           DateTime
+  birthPlace          String
+  nip                 String?               @unique
+  nik                 String                @unique
+  sip                 String                @unique
+  str                 String                @unique
+  bpjsCode            String?               @unique
+  satuSehatId         String?               @unique
+  specialization      String
+  status              DoctorStatus          @default(aktif)
+  address             Address               @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  addressId           String                @unique
+  telecom             Telecom[]
+  doctorSchedule      DoctorSchedule[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  PatientRegistration PatientRegistration[]
+}
+
+model Organization {
+  id        String    @id @default(uuid())
+  name      String
+  type      String?
+  alias     String?
+  telecom   Telecom[]
+  address   Address?  @relation(fields: [addressId], references: [id])
+  addressId String?   @unique
+  rooms     Room[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Room {
+  id                     String                @id @default(uuid())
+  identifier             String                @unique
+  use                    UseRoom               @default(usual)
+  system                 String                @default("room")
+  status                 RoomStatus            @default(active)
+  operationalStatus      OperationalStatus     @default(O)
+  name                   String
+  alias                  String
+  description            String
+  mode                   LocationMode          @default(instance)
+  type                   LocationType          @default(room)
+  serviceClass           ServiceClass
+  installation           Installation
+  telecom                Telecom[]
+  physicalType           PhysicalType          @default(ro)
+  satuSehatId            String?               @unique
+  availabilityExceptions String?
+  longitude              Float
+  latitude               Float
+  altitude               Float
+  Tindakan               Tindakan[]
+  HoursOfOperation       HoursOfOperation[]
+  managingOrganization   Organization?         @relation(fields: [organizationId], references: [id])
+  organizationId         String?
+  partOf                 Room?                 @relation("RoomHierarchy", fields: [parentRoomId], references: [id])
+  parentRoomId           String?
+  childRooms             Room[]                @relation("RoomHierarchy")
+  address                Address               @relation(fields: [addressId], references: [id])
+  addressId              String                @unique
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  doctorSchedule         DoctorSchedule[]
+  PatientRegistration    PatientRegistration[]
+}
+
+model HoursOfOperation {
+  id          String   @id @default(uuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  daysOfWeek  String // Menyimpan sebagai "mon,tue,wed,thu,fri"
+  allDay      Boolean
+  openingTime String?
+  closingTime String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Tindakan {
+  id             String       @id @default(uuid())
+  name           String /// Nama Tindakan
+  description    String?
+  type           TindakanType
+  icdCode        String? /// Kode ICD-9-CM atau ICD-10-PCS untuk prosedur
+  snomed         String? /// Kode SNOMED CT untuk tindakan (digunakan di Satu Sehat)
+  componentTarif String? /// Komponen Tarif (bisa berupa deskripsi komponen)
+  baseTarif      Float /// Tarif Tindakan (tarif dasar)
+  discountTarif  Float? /// Tarif Diskon (jika ada)
+  cytoTarif      Float? /// Tarif Cyto (jika aplikabel)
+  finalTarif     Float /// Tarif Akhir (setelah diskon, jika ada)
+  finalCytoTarif Float? /// Tarif Akhir Cyto (jika aplikabel)
+  bpjsCode       String? /// Kode tindakan BPJS (jika ada)
+  isActive       Boolean      @default(true) /// Status keaktifan tindakan
+  roomId         String
+  room           Room         @relation(fields: [roomId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model DoctorSchedule {
+  id                    String   @id @default(uuid())
+  doctorId              String
+  doctor                Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  roomId                String
+  room                  Room     @relation(fields: [roomId], references: [id])
+  dayOfWeek             Int // 0 = Minggu, 1 = Senin, dst.
+  startTime             DateTime
+  endTime               DateTime
+  isActive              Boolean  @default(true)
+  totalQuota            Int
+  offlineQuota          Int
+  onlineQuota           Int
+  remainingOfflineQuota Int
+  remainingOnlineQuota  Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([doctorId, dayOfWeek])
+}
+
+model Patient {
+  id                        String                @id @default(uuid())
+  medicalRecordNumber       String                @unique
+  satuSehatId               String?               @unique
+  bpjsCode                  String?               @unique
+  identifierType            IdentifierType
+  identifier                String?
+  nomorKartuKeluarga        String
+  name                      String
+  birthDate                 DateTime
+  birthPlace                String
+  gender                    Gender
+  multipleBirthInteger      Int
+  bloodType                 BloodType?
+  education                 Education?
+  religion                  Religion?
+  address                   Address               @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  addressId                 String                @unique
+  telecom                   Telecom[]
+  maritalStatus             MaritalStatus?
+  citizenshipStatus         CitizenshipStatus
+  relatedPersons            RelatedPerson[]
+  responsiblePersonName     String
+  responsiblePersonRelation RelationshipType
+  responsiblePersonPhone    String
+  isResponsiblePersonSelf   Boolean               @default(false)
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  PatientRegistration       PatientRegistration[]
+
+  @@unique([name, birthDate, gender])
+}
+
+model PatientRegistration {
+  id                 String             @id @default(uuid())
+  registrationNumber String             @unique
+  patientId          String
+  patient            Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId           String
+  doctor             Doctor             @relation(fields: [doctorId], references: [id])
+  roomId             String
+  room               Room               @relation(fields: [roomId], references: [id])
+  paymentMethodId    String
+  PaymentMethod      PaymentMethod?     @relation(fields: [paymentMethodId], references: [id])
+  registrationDate   DateTime
+  status             RegistrationStatus @default(draft)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model RelatedPerson {
+  id           String    @id @default(uuid())
+  patientId    String
+  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  relationType String
+  name         String
+  gender       Gender
+  birthDate    DateTime
+  address      Address   @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  addressId    String    @unique
+  telecom      Telecom[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Address {
+  id            String           @id @default(uuid())
+  use           String           @default("home")
+  line          String
+  city          String
+  postalCode    String
+  country       String           @default("ID")
+  extension     AddressExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  extensionId   String           @unique
+  patient       Patient?
+  RelatedPerson RelatedPerson?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  Doctor        Doctor?
+  Organization  Organization?
+  Room          Room?
+}
+
+model AddressExtension {
+  id        String   @id @default(uuid())
+  province  String
+  city      String
+  district  String
+  village   String
+  rt        String
+  rw        String
+  address   Address?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model Telecom {
+  id              String         @id @default(uuid())
+  system          TelecomSystem  @default(phone)
+  use             TelecomUse     @default(home)
+  value           String
+  patient         Patient?       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId       String?
+  RelatedPerson   RelatedPerson? @relation(fields: [relatedPersonId], references: [id], onDelete: Cascade)
+  relatedPersonId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  Doctor          Doctor?        @relation(fields: [doctorId], references: [id])
+  doctorId        String?
+  Room            Room?          @relation(fields: [roomId], references: [id])
+  roomId          String?
+  Organization    Organization?  @relation(fields: [organizationId], references: [id])
+  organizationId  String?
+}
 
-model Patient {
-  id String @id @default(cuid())
-  nik String @unique
-  nama String
-  tempatLahir String
-  tanggalLahir DateTime
-  jenisKelamin JenisKelamin
-  alamat String
-  provinsi String
-  kota String
-  daerah String
-  kecamatan String
+model PaymentMethod {
+  id                   String                @id @default(uuid())
+  name                 String                @unique
+  description          String?
+  isActive             Boolean               @default(true)
+  patientRegistrations PatientRegistration[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 }
