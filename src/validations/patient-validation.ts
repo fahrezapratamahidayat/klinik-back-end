@@ -1,13 +1,120 @@
 import { z } from "zod";
+import {
+  IdentifierType,
+  Gender,
+  MaritalStatus,
+  CitizenshipStatus,
+  BloodType,
+  Education,
+  Religion,
+  RelationshipType,
+  RegistrationStatus,
+} from "@prisma/client";
 
 export const createPatientValidation = z.object({
-    nik: z.string(),
-    nama: z.string(),
-    tempatLahir: z.string(),
-    tanggalLahir: z.string(),
-    jenisKelamin: z.string(),
-    alamat: z.string(),
-    provinsi: z.string(),
-    kota: z.string(),
-  });
-  
+  medicalRecordNumber: z.string().optional(),
+  satuSehatId: z.string().optional().nullable(),
+  bpjsCode: z.string().optional().nullable(),
+  identifierType: z.nativeEnum(IdentifierType),
+  identifier: z.string().optional().nullable(),
+  nomorKartuKeluarga: z.string(),
+  name: z.string().min(1, "Nama harus diisi"),
+  birthDate: z.coerce.date(),
+  birthPlace: z.string(),
+  gender: z.nativeEnum(Gender),
+  multipleBirthInteger: z.number().int().nonnegative(),
+  bloodType: z.nativeEnum(BloodType).optional().nullable(),
+  education: z.nativeEnum(Education).optional().nullable(),
+  religion: z.nativeEnum(Religion).optional().nullable(),
+  address: z.object({
+    use: z.string(),
+    line: z.string(),
+    city: z.string(),
+    postalCode: z.string(),
+    country: z.string(),
+    extension: z.object({
+      province: z.string(),
+      city: z.string(),
+      district: z.string(),
+      village: z.string(),
+      rt: z.string(),
+      rw: z.string(),
+    }),
+  }),
+  telecom: z.array(
+    z.object({
+      system: z.string(),
+      value: z.string(),
+      use: z.string(),
+    })
+  ),
+  maritalStatus: z.nativeEnum(MaritalStatus),
+  citizenshipStatus: z.nativeEnum(CitizenshipStatus),
+  relatedPersons: z
+    .array(
+      z.object({
+        relationType: z.string(),
+        name: z.string(),
+        gender: z.nativeEnum(Gender),
+        birthDate: z.coerce.date(),
+      })
+    )
+    .optional(),
+  responsiblePersonName: z.string(),
+  responsiblePersonRelation: z.nativeEnum(RelationshipType),
+  responsiblePersonPhone: z.string(),
+  isResponsiblePersonSelf: z.boolean().default(false),
+});
+
+export const createNewbornPatientValidation = z.object({
+  name: z.string().min(1, "Nama bayi harus diisi"),
+  birthDate: z.coerce.date(),
+  birthPlace: z.string().min(1, "Tempat lahir harus diisi"),
+  gender: z.nativeEnum(Gender),
+  multipleBirthInteger: z.number().int().nonnegative().default(1),
+  motherNIK: z.string().min(16).max(16, "NIK ibu harus 16 digit"),
+  address: z.object({
+    use: z.string(),
+    line: z.string(),
+    city: z.string(),
+    postalCode: z.string(),
+    country: z.string(),
+    extension: z.object({
+      province: z.string(),
+      city: z.string(),
+      district: z.string(),
+      village: z.string(),
+      rt: z.string(),
+      rw: z.string(),
+    }),
+  }),
+  telecom: z
+    .array(
+      z.object({
+        system: z.string(),
+        value: z.string(),
+        use: z.string(),
+      })
+    )
+    .optional(),
+  nomorKartuKeluarga: z
+    .string()
+    .min(16)
+    .max(16, "Nomor Kartu Keluarga harus 16 digit"),
+  responsiblePersonName: z.string().min(1, "Nama penanggung jawab harus diisi"),
+  responsiblePersonRelation: z.nativeEnum(RelationshipType),
+  responsiblePersonPhone: z
+    .string()
+    .min(10, "Nomor telepon penanggung jawab harus diisi"),
+});
+
+
+export const createPatientRegistrationValidation = z.object({
+  patientId: z.string(),
+  doctorId: z.string(),
+  roomId: z.string(),
+  paymentMethodId: z.string(),
+  status: z.nativeEnum(RegistrationStatus).default("draft").optional(),
+  scheduleId: z.string(),
+  isOnline: z.boolean(),
+});
