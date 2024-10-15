@@ -9,8 +9,15 @@ export const createPatientRegistration = async (
   req: Request,
   res: Response
 ) => {
-  const { patientId, doctorId, paymentMethodId, roomId, scheduleId, isOnline } =
-    req.body;
+  const {
+    patientId,
+    doctorId,
+    paymentMethodId,
+    roomId,
+    scheduleId,
+    isOnline,
+    encounterType,
+  } = req.body;
   if (!validateInput(createPatientRegistrationValidation, req, res)) return;
 
   try {
@@ -45,9 +52,13 @@ export const createPatientRegistration = async (
 
     // Validasi jadwal dokter untuk hari ini
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = Minggu, 1 = Senin, dst.
+    const currentTime = today.toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
-    if (doctorSchedule.dayOfWeek !== dayOfWeek) {
+    if (doctorSchedule.date.toDateString() !== today.toDateString()) {
       return res.status(400).json({
         status: false,
         statusCode: 400,
@@ -55,13 +66,15 @@ export const createPatientRegistration = async (
       });
     }
 
-    // Validasi waktu jadwal
-    const currentTime = new Date();
-    if (currentTime > doctorSchedule.endTime) {
+    // Validasi waktu pendaftaran
+    if (
+      currentTime < doctorSchedule.startTime ||
+      currentTime > doctorSchedule.endTime
+    ) {
       return res.status(400).json({
         status: false,
         statusCode: 400,
-        message: "Jadwal dokter untuk hari ini sudah berakhir",
+        message: "Waktu pendaftaran di luar jadwal praktik dokter",
       });
     }
 
@@ -90,6 +103,16 @@ export const createPatientRegistration = async (
         paymentMethodId,
         registrationNumber,
         registrationDate: new Date(),
+      },
+    });
+
+    // Create Encounter
+    const encounter = await prisma.encounter.create({
+      data: {
+        patientRegistrationId: patientRegistration.id,
+        encounterType,
+        status: "planned",
+        startDate: new Date(),
       },
     });
 
