@@ -12,7 +12,6 @@ import {
 } from "@prisma/client";
 
 export const createPatientValidation = z.object({
-  medicalRecordNumber: z.string().optional(),
   satuSehatId: z.string().optional().nullable(),
   bpjsCode: z.string().optional().nullable(),
   identifierType: z.nativeEnum(IdentifierType),
