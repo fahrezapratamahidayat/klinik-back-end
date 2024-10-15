@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Day, PrismaClient } from "@prisma/client";
 import { Request, Response } from "express";
 import { validateInput } from "../../helpers/validation";
 import { createDoctorScheduleValidation } from "../../validations/doctor-validation";
@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export const createDoctorSchedule = async (req: Request, res: Response) => {
   const {
     doctorId,
-    dayOfWeek,
+    date,
     startTime,
     endTime,
     isActive,
@@ -29,8 +29,20 @@ export const createDoctorSchedule = async (req: Request, res: Response) => {
         .json({ message: "Total kuota harus lebih dari 0" });
     }
 
+    // validasi tanggal harus melebihi tanggal hari ini
+    const today = new Date();
+    if (date < today) {
+      return res
+        .status(400)
+        .json({ message: "Tanggal harus melebihi tanggal hari ini" });
+    }
+
+    // Parsing tanggal dan waktu
+    const scheduleDate = new Date(date);
     const [startHour, startMinute] = startTime.split(":").map(Number);
     const [endHour, endMinute] = endTime.split(":").map(Number);
+
+    // Validasi waktu
     if (
       startHour > endHour ||
       (startHour === endHour && startMinute >= endMinute)
@@ -40,48 +52,63 @@ export const createDoctorSchedule = async (req: Request, res: Response) => {
         .json({ message: "Waktu mulai harus sebelum waktu selesai" });
     }
 
-    // Hitung tanggal jadwal
-    const currentDate = new Date();
-    const scheduleDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      currentDate.getDate() + ((7 + dayOfWeek - currentDate.getDay()) % 7)
-    );
 
-    // validasi kalau doctor tidak ada
+    // Mendapatkan nama hari
+    const day = [
+      Day.Minggu,
+      Day.Senin,
+      Day.Selasa,
+      Day.Rabu,
+      Day.Kamis,
+      Day.Jumat,
+      Day.Sabtu,
+    ][scheduleDate.getDay()];
+
+    // Validasi dokter
     const doctor = await prisma.doctor.findUnique({
-      where: {
-        id: doctorId,
-      },
+      where: { id: doctorId },
     });
     if (!doctor) {
-      return res.status(404).json({ message: "Doctor not found" });
+      return res.status(404).json({ message: "Dokter tidak ditemukan" });
     }
 
-    // validasi kalau room tidak ada
+    // Validasi ruangan
     const room = await prisma.room.findUnique({
-      where: {
-        id: roomId,
-      },
+      where: { id: roomId },
     });
     if (!room) {
-      return res.status(404).json({ message: "Room not found" });
+      return res.status(404).json({ message: "Ruangan tidak ditemukan" });
+    }
+
+    // Cek jadwal yang sudah ada
+    const existingSchedule = await prisma.doctorSchedule.findFirst({
+      where: {
+        doctorId,
+        date: scheduleDate,
+      },
+    });
+
+    if (existingSchedule) {
+      return res
+        .status(400)
+        .json({ message: "Jadwal dokter untuk tanggal ini sudah ada" });
     }
 
     // Buat jadwal dokter
     const schedule = await prisma.doctorSchedule.create({
       data: {
         doctorId,
-        dayOfWeek,
-        startTime: new Date(scheduleDate.setHours(startHour, startMinute)),
-        endTime: new Date(scheduleDate.setHours(endHour, endMinute)),
+        roomId,
+        date: scheduleDate,
+        day,
+        startTime,
+        endTime,
         isActive,
         totalQuota,
         offlineQuota,
         onlineQuota,
         remainingOfflineQuota: offlineQuota,
         remainingOnlineQuota: onlineQuota,
-        roomId,
       },
     });
 
@@ -94,7 +121,7 @@ export const createDoctorSchedule = async (req: Request, res: Response) => {
     if (error.code === "P2002") {
       return res
         .status(400)
-        .json({ message: "Jadwal dokter untuk hari ini sudah ada" });
+        .json({ message: "Jadwal dokter untuk tanggal ini sudah ada" });
     }
     return res
       .status(500)
