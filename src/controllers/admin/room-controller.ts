@@ -1,92 +1,132 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { Request, Response } from "express";
 import { validateInput } from "../../helpers/validation";
 import { createRoomValidation } from "../../validations/room-validation";
 import { generateRoomCode } from "../../utils/generate";
+import { ZodError } from "zod";
 const prisma = new PrismaClient();
 
-export const createRoom = async (req: Request, res: Response) => {
-  const {
-    name,
-    alias,
-    description,
-    mode,
-    type,
-    serviceClass,
-    installation,
-    operationalStatus,
-    longitude,
-    latitude,
-    altitude,
-    address,
-    telecom,
-    physicalType,
-    availabilityExceptions,
-    hoursOfOperation,
-  } = req.body;
 
-  if (!validateInput(createRoomValidation, req, res)) return;
+export const createRoom = async (req: Request, res: Response) => {
   try {
+    const validatedData = createRoomValidation.parse(req.body);
+    const {
+      name,
+      alias,
+      description,
+      mode,
+      type,
+      serviceClass,
+      installation,
+      operationalStatus,
+      longitude,
+      latitude,
+      altitude,
+      address,
+      telecom,
+      physicalType,
+      availabilityExceptions,
+      hoursOfOperation,
+    } = validatedData;
+
     const roomCode = await generateRoomCode(installation);
+
+    const roomData: any = {
+      identifier: roomCode,
+      name,
+      alias,
+      description,
+      mode,
+      type,
+      serviceClass,
+      installation,
+      operationalStatus,
+      longitude,
+      latitude,
+      altitude,
+      physicalType,
+      availabilityExceptions,
+    };
+
+    if (telecom && telecom.length > 0) {
+      roomData.telecom = {
+        create: telecom,
+      };
+    }
+
+    if (hoursOfOperation && hoursOfOperation.length > 0) {
+      roomData.HoursOfOperation = {
+        create: hoursOfOperation,
+      };
+    }
+
+    if (address) {
+      roomData.address = {
+        create: {
+          use: address.use,
+          line: address.line,
+          city: address.city,
+          postalCode: address.postalCode,
+          country: address.country,
+          extension: address.extension
+            ? {
+                create: {
+                  provinceCode: address.extension.provinceCode,
+                  districtCode: address.extension.districtCode,
+                  subdistrictCode: address.extension.subdistrictCode,
+                  villageCode: address.extension.villageCode,
+                  rt: address.extension.rt,
+                  rw: address.extension.rw,
+                },
+              }
+            : undefined,
+        },
+      };
+    }
+
     const room = await prisma.room.create({
-      data: {
-        identifier: roomCode,
-        name,
-        alias,
-        description,
-        mode,
-        type,
-        serviceClass,
-        installation,
-        operationalStatus,
-        longitude,
-        latitude,
-        altitude,
-        address: {
-          create: {
-            use: address.use,
-            line: address.line,
-            city: address.city,
-            postalCode: address.postalCode,
-            country: address.country,
-            extension: {
-              create: {
-                province: address.extension.province,
-                city: address.extension.city,
-                district: address.extension.district,
-                village: address.extension.village,
-                rt: address.extension.rt,
-                rw: address.extension.rw,
-              },
-            },
-          },
-        },
-        telecom: {
-          create: telecom,
-        },
-        physicalType,
-        availabilityExceptions,
-        HoursOfOperation: {
-          create: hoursOfOperation,
-        },
-      },
+      data: roomData,
     });
+
     res.status(201).json({
       status: true,
       statusCode: 201,
-      message: "Room created successfully",
+      message: "Ruangan berhasil dibuat",
       data: {
         name: room.name,
         identifier: room.identifier,
       },
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "Validasi gagal",
+        errors: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+        })),
+      });
+    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      let errorMessage = "Terjadi kesalahan saat membuat ruangan";
+      if (error.code === 'P2003') {
+        errorMessage = "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
+      }
+      res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: errorMessage,
+        errorDetail: error
+      });
+    } else {
+      res.status(500).json({
+        status: false,
+        statusCode: 500,
+        message: "Terjadi kesalahan internal server",
+        error: error instanceof Error ? error.message : "Kesalahan tidak diketahui",
+      });
+    }
   }
 };
 
