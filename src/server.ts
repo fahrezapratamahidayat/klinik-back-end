@@ -5,16 +5,24 @@ import { routes } from './routes';
 import { logger } from './utils/logger';
 import * as dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import cors from 'cors';
 const app: Application = express();
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(express.json());
+
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
 
 const envFile = `.env.${process.env.NODE_ENV || 'local'}`;
 const prisma = new PrismaClient();
 dotenv.config({ path: envFile });
 
-const PORT = process.env.PORT || 3000;
+
+const PORT = process.env.PORT || 5173;
 
 app.get('/token', async (req, res) => {
   try {
