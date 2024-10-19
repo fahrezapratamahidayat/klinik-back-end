@@ -7,6 +7,8 @@ import {
   LocationMode,
   LocationType,
   PhysicalType,
+  TelecomSystem,
+  TelecomUse,
 } from "@prisma/client";
 import { z } from "zod";
 
@@ -15,45 +17,45 @@ export const createRoomValidation = z.object({
   system: z.string().default("room"),
   status: z.nativeEnum(RoomStatus).default("active"),
   operationalStatus: z.nativeEnum(OperationalStatus).default("O"),
-  name: z.string().min(1),
-  alias: z.string().optional(),
-  description: z.string().optional(),
+  name: z.string().min(1, "Nama ruangan harus diisi"),
+  alias: z.string().min(1, "Alias ruangan harus diisi"),
+  description: z.string().min(1, "Deskripsi ruangan harus diisi"),
   mode: z.nativeEnum(LocationMode).default("instance"),
   type: z.nativeEnum(LocationType).default("room"),
   serviceClass: z.nativeEnum(ServiceClass),
   installation: z.nativeEnum(Installation),
   physicalType: z.nativeEnum(PhysicalType).default("ro"),
-  longitude: z.number(),
-  latitude: z.number(),
-  altitude: z.number(),
-  address: z.object({
-    use: z.string(),
-    line: z.string(),
-    city: z.string(),
-    postalCode: z.string(),
-    country: z.string(),
-    extension: z.object({
-      province: z.string(),
-      city: z.string(),
-      district: z.string(),
-      village: z.string(),
-      rt: z.string(),
-      rw: z.string(),
-    }),
-  }),
   satuSehatId: z.string().optional(),
   availabilityExceptions: z.string().optional(),
+  longitude: z.number().optional(),
+  latitude: z.number().optional(),
+  altitude: z.number().optional(),
   organizationId: z.string().optional(),
   parentRoomId: z.string().optional(),
-  addressId: z.string().optional(),
-  hoursOfOperation: z
-    .array(
-      z.object({
-        daysOfWeek: z.string(),
-        allDay: z.boolean(),
-        openingTime: z.string().optional(),
-        closingTime: z.string().optional(),
-      })
-    )
-    .optional(),
+  address: z.object({
+    use: z.string().optional(),
+    line: z.string().optional(),
+    city: z.string().optional(),
+    postalCode: z.string().optional(),
+    country: z.string().optional(),
+    extension: z.object({
+      provinceCode: z.string().optional(),
+      districtCode: z.string().optional(),
+      subdistrictCode: z.string().optional(),
+      villageCode: z.string().optional(),
+      rt: z.string().optional(),
+      rw: z.string().optional(),
+    }).optional(),
+  }).optional(),
+  telecom: z.array(z.object({
+    system: z.nativeEnum(TelecomSystem).default("phone"),
+    use: z.nativeEnum(TelecomUse).default("home"),
+    value: z.string().min(1, "Nomor telepon/email harus diisi"),
+  })).optional(),
+  hoursOfOperation: z.array(z.object({
+    daysOfWeek: z.string().min(1, "Hari operasional harus diisi"),
+    allDay: z.boolean(),
+    openingTime: z.string().optional(),
+    closingTime: z.string().optional(),
+  })).optional(),
 });
