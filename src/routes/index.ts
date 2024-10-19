@@ -8,7 +8,7 @@ const _routes: Array<[string, Router]> = [
     ['/', MainRouter],
     ['/api/pendaftaran', PendaftaranRoutes],
     ['/api/admin', AdminRoutes],
-    ['/api/location', LocationRoutes]
+    ['/api/locations', LocationRoutes]
 ]
 
 export const routes = (app: Application) => {
