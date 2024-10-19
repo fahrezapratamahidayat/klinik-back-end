@@ -242,7 +242,7 @@ enum AnamnesisCategory {
 model Encounter {
   id                       String                     @id @default(uuid())
   patientRegistrationId    String
-  patientRegistration      PatientRegistration        @relation(fields: [patientRegistrationId], references: [id])
+  patientRegistration      PatientRegistration        @relation(fields: [patientRegistrationId], references: [id], onDelete: Cascade)
   encounterType            EncounterType
   status                   EncounterStatus
   startDate                DateTime
@@ -250,11 +250,11 @@ model Encounter {
   diagnosis                String?
   treatmentPlan            String?
   notes                    String?
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
   Anamnesis                Anamnesis[]
   PhysicalExamination      PhysicalExamination[]
   PsychologicalExamination PsychologicalExamination[]
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 }
 
 model Anamnesis {
@@ -376,7 +376,7 @@ model Doctor {
   gender              Gender
   birthDate           DateTime
   birthPlace          String
-  nip                 String?               @unique
+  nip                 String               @unique
   nik                 String                @unique
   sip                 String                @unique
   str                 String                @unique
@@ -388,9 +388,9 @@ model Doctor {
   addressId           String                @unique
   telecom             Telecom[]
   doctorSchedule      DoctorSchedule[]
+  PatientRegistration PatientRegistration[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
-  PatientRegistration PatientRegistration[]
 }
 
 model Organization {
@@ -424,28 +424,25 @@ model Room {
   physicalType           PhysicalType          @default(ro)
   satuSehatId            String?               @unique
   availabilityExceptions String?
-  longitude              Float
-  latitude               Float
-  altitude               Float
+  longitude              Float?
+  latitude               Float?
+  altitude               Float?
   Tindakan               Tindakan[]
   HoursOfOperation       HoursOfOperation[]
-  managingOrganization   Organization?         @relation(fields: [organizationId], references: [id])
+  managingOrganization   Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId         String?
-  partOf                 Room?                 @relation("RoomHierarchy", fields: [parentRoomId], references: [id])
-  parentRoomId           String?
-  childRooms             Room[]                @relation("RoomHierarchy")
-  address                Address               @relation(fields: [addressId], references: [id])
-  addressId              String                @unique
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  address                Address?              @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  addressId              String?               @unique
   doctorSchedule         DoctorSchedule[]
   PatientRegistration    PatientRegistration[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 }
 
 model HoursOfOperation {
   id          String   @id @default(uuid())
   roomId      String
-  room        Room     @relation(fields: [roomId], references: [id])
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   daysOfWeek  String // Menyimpan sebagai "mon,tue,wed,thu,fri"
   allDay      Boolean
   openingTime String?
@@ -470,7 +467,7 @@ model Tindakan {
   bpjsCode       String? /// Kode tindakan BPJS (jika ada)
   isActive       Boolean      @default(true) /// Status keaktifan tindakan
   roomId         String
-  room           Room         @relation(fields: [roomId], references: [id])
+  room           Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -490,7 +487,7 @@ model DoctorSchedule {
   doctorId              String
   doctor                Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   roomId                String
-  room                  Room     @relation(fields: [roomId], references: [id])
+  room                  Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   date                  DateTime
   day                   Day
   startTime             String
@@ -533,9 +530,9 @@ model Patient {
   responsiblePersonRelation RelationshipType
   responsiblePersonPhone    String
   isResponsiblePersonSelf   Boolean               @default(false)
+  PatientRegistration       PatientRegistration[]
   createdAt                 DateTime              @default(now())
   updatedAt                 DateTime              @updatedAt
-  PatientRegistration       PatientRegistration[]
 
   @@unique([name, birthDate, gender])
 }
@@ -546,16 +543,16 @@ model PatientRegistration {
   patientId          String
   patient            Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctorId           String
-  doctor             Doctor             @relation(fields: [doctorId], references: [id])
+  doctor             Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   roomId             String
-  room               Room               @relation(fields: [roomId], references: [id])
+  room               Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
   paymentMethodId    String
-  PaymentMethod      PaymentMethod?     @relation(fields: [paymentMethodId], references: [id])
+  PaymentMethod      PaymentMethod?     @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
   registrationDate   DateTime
   status             RegistrationStatus @default(draft)
+  Encounter          Encounter[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
-  Encounter          Encounter[]
 }
 
 model RelatedPerson {
@@ -575,33 +572,37 @@ model RelatedPerson {
 
 model Address {
   id            String           @id @default(uuid())
-  use           String           @default("home")
-  line          String
-  city          String
-  postalCode    String
-  country       String           @default("ID")
+  use           String?          @default("home") /// rumah, kantor, sementara, lama, lainnya
+  line          String /// jalan, gedung, koridor, ruangan, tempat tidur, kendaraan, rumah, lemari, jalan, area
+  city          String? /// kota, kabupaten, provinsi
+  postalCode    String? /// kode pos
+  country       String           @default("ID") /// negara
   extension     AddressExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
   extensionId   String           @unique
   patient       Patient?
   RelatedPerson RelatedPerson?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
   Doctor        Doctor?
   Organization  Organization?
   Room          Room?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }
 
 model AddressExtension {
-  id        String   @id @default(uuid())
-  province  String
-  city      String
-  district  String
-  village   String
-  rt        String
-  rw        String
-  address   Address?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String      @id @default(uuid())
+  province        Province    @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  provinceCode    String
+  district        District    @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+  districtCode    String
+  subdistrict     Subdistrict @relation(fields: [subdistrictCode], references: [code], onDelete: Cascade)
+  subdistrictCode String
+  village         Village     @relation(fields: [villageCode], references: [code], onDelete: Cascade)
+  villageCode     String
+  rt              String?
+  rw              String?
+  address         Address?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 model Telecom {
@@ -613,14 +614,14 @@ model Telecom {
   patientId       String?
   RelatedPerson   RelatedPerson? @relation(fields: [relatedPersonId], references: [id], onDelete: Cascade)
   relatedPersonId String?
+  Doctor          Doctor?        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId        String?
+  Room            Room?          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId          String?
+  Organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId  String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  Doctor          Doctor?        @relation(fields: [doctorId], references: [id])
-  doctorId        String?
-  Room            Room?          @relation(fields: [roomId], references: [id])
-  roomId          String?
-  Organization    Organization?  @relation(fields: [organizationId], references: [id])
-  organizationId  String?
 }
 
 model PaymentMethod {
@@ -631,4 +632,45 @@ model PaymentMethod {
   patientRegistrations PatientRegistration[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+}
+
+model Province {
+  name             String
+  code             String             @unique
+  District         District[]
+  AddressExtension AddressExtension[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model District {
+  name             String
+  code             String             @unique
+  provinceCode     String
+  province         Province           @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  Subdistrict      Subdistrict[]
+  AddressExtension AddressExtension[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model Subdistrict {
+  name             String
+  code             String             @unique
+  districtCode     String
+  district         District           @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+  Village          Village[]
+  AddressExtension AddressExtension[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model Village {
+  name             String
+  code             String             @unique
+  subdistrictCode  String
+  subdistrict      Subdistrict        @relation(fields: [subdistrictCode], references: [code], onDelete: Cascade)
+  AddressExtension AddressExtension[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
