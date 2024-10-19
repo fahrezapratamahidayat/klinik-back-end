@@ -93,10 +93,10 @@ export const createPatient = async (req: Request, res: Response) => {
             country: address.country,
             extension: {
               create: {
-                province: address.extension.province,
-                city: address.extension.city,
-                district: address.extension.district,
-                village: address.extension.village,
+                provinceCode: address.extension.provinceCode,
+                districtCode: address.extension.districtCode,
+                subdistrictCode: address.extension.subdistrictCode,
+                villageCode: address.extension.villageCode,
                 rt: address.extension.rt,
                 rw: address.extension.rw,
               },
@@ -186,10 +186,10 @@ export const createNewbornPatient = async (req: Request, res: Response) => {
             country: address.country,
             extension: {
               create: {
-                province: address.extension.province,
-                city: address.extension.city,
-                district: address.extension.district,
-                village: address.extension.village,
+                provinceCode: address.extension.provinceCode,
+                districtCode: address.extension.districtCode,
+                subdistrictCode: address.extension.subdistrictCode,
+                villageCode: address.extension.villageCode,
                 rt: address.extension.rt,
                 rw: address.extension.rw,
               },
@@ -241,11 +241,32 @@ export const getAllPatients = async (req: Request, res: Response) => {
     const patients = await prisma.patient.findMany({
       select: {
         id: true,
+        medicalRecordNumber: true,
         identifier: false,
+        identifierType: true,
         name: true,
         birthDate: true,
         birthPlace: true,
         gender: true,
+        address: {
+          select: {
+            use: true,
+            line: true,
+            city: true,
+            postalCode: true,
+            country: true,
+            extension: {
+              select: {
+                provinceCode: false,
+                districtCode: false,
+                subdistrictCode: false,
+                villageCode: false,
+                rt: true,
+                rw: true,
+              },
+            },
+          },
+        },
         createdAt: true,
         updatedAt: true,
       },
@@ -272,7 +293,32 @@ export const getPatientById = async (req: Request, res: Response) => {
       include: {
         address: {
           include: {
-            extension: true,
+            extension: {
+              select: {
+                rt: true,
+                rw: true,
+                province: {
+                  select: {
+                    name: true,
+                  },
+                },
+                district: {
+                  select: {
+                    name: true,
+                  },
+                },
+                subdistrict: {
+                  select: {
+                    name: true,
+                  },
+                },
+                village: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         telecom: true,
