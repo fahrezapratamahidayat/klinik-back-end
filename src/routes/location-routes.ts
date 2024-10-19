@@ -1,6 +1,9 @@
-import { Router } from "express";
-import { getProvince } from "../controllers/location-controller";
+import { RequestHandler, Router } from "express";
+import { getProvince, getDistrict, getSubdistrict, getVillage } from "../controllers/location-controller";
 
 export const LocationRoutes: Router = Router();
 
-LocationRoutes.get("/province", getProvince);
+LocationRoutes.get('/provinces', getProvince as RequestHandler);
+LocationRoutes.get('/districts/:provinceId', getDistrict as RequestHandler);
+LocationRoutes.get('/subdistricts/:districtId', getSubdistrict as RequestHandler);
+LocationRoutes.get('/villages/:subdistrictId', getVillage as RequestHandler);  
