@@ -198,14 +198,20 @@ export const deleteDoctor = async (req: Request, res: Response) => {
     });
     if (!doctor)
       return res.status(404).json({
+        status: false,
+        statusCode: 404,
         message: "Doctor not found",
       });
     res.status(200).json({
+      status: true,
+      statusCode: 200,
       message: "Doctor deleted successfully",
       data: doctor,
     });
   } catch (error) {
     res.status(500).json({
+      status: false,
+      statusCode: 500,
       message: "Internal server error",
       error: error instanceof Error ? error.message : "Unknown error",
     });
