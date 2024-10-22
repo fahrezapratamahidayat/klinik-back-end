@@ -376,7 +376,7 @@ model Doctor {
   gender              Gender
   birthDate           DateTime
   birthPlace          String
-  nip                 String               @unique
+  nip                 String                @unique
   nik                 String                @unique
   sip                 String                @unique
   str                 String                @unique
@@ -572,11 +572,11 @@ model RelatedPerson {
 
 model Address {
   id            String           @id @default(uuid())
-  use           String?          @default("home") /// rumah, kantor, sementara, lama, lainnya
-  line          String /// jalan, gedung, koridor, ruangan, tempat tidur, kendaraan, rumah, lemari, jalan, area
-  city          String? /// kota, kabupaten, provinsi
-  postalCode    String? /// kode pos
-  country       String           @default("ID") /// negara
+  use           String           @default("home")
+  line          String
+  city          String
+  postalCode    String
+  country       String           @default("ID")
   extension     AddressExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
   extensionId   String           @unique
   patient       Patient?
