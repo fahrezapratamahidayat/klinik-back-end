@@ -5,71 +5,29 @@ import { createDoctorScheduleValidation } from "../../validations/doctor-validat
 const prisma = new PrismaClient();
 
 export const createDoctorSchedule = async (req: Request, res: Response) => {
-  const {
-    doctorId,
-    date,
-    startTime,
-    endTime,
-    isActive,
-    offlineQuota,
-    onlineQuota,
-    roomId,
-  } = req.body;
+  const validationResult = createDoctorScheduleValidation.safeParse(req.body);
 
-  if (!validateInput(createDoctorScheduleValidation, req, res)) {
-    return;
+  if (!validationResult.success) {
+    return res.status(400).json({
+      status: false,
+      statusCode: 400,
+      message: "Data tidak valid",
+      errors: validationResult.error.errors.map(error => ({
+        path: error.path.join('.'),
+        message: error.message
+      }))
+    });
   }
 
+  const { doctorId, roomId, schedules } = validationResult.data;
+
   try {
-    // Validasi input
-    const totalQuota = offlineQuota + onlineQuota;
-    if (totalQuota < 1) {
-      return res
-        .status(400)
-        .json({ message: "Total kuota harus lebih dari 0" });
-    }
-
-    // validasi tanggal harus melebihi tanggal hari ini
-    const today = new Date();
-    if (date < today) {
-      return res
-        .status(400)
-        .json({ message: "Tanggal harus melebihi tanggal hari ini" });
-    }
-
-    // Parsing tanggal dan waktu
-    const scheduleDate = new Date(date);
-    const [startHour, startMinute] = startTime.split(":").map(Number);
-    const [endHour, endMinute] = endTime.split(":").map(Number);
-
-    // Validasi waktu
-    if (
-      startHour > endHour ||
-      (startHour === endHour && startMinute >= endMinute)
-    ) {
-      return res
-        .status(400)
-        .json({ message: "Waktu mulai harus sebelum waktu selesai" });
-    }
-
-
-    // Mendapatkan nama hari
-    const day = [
-      Day.Minggu,
-      Day.Senin,
-      Day.Selasa,
-      Day.Rabu,
-      Day.Kamis,
-      Day.Jumat,
-      Day.Sabtu,
-    ][scheduleDate.getDay()];
-
     // Validasi dokter
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
     });
     if (!doctor) {
-      return res.status(404).json({ message: "Dokter tidak ditemukan" });
+      return res.status(404).json({ status: false, statusCode: 404, message: "Dokter tidak ditemukan" });
     }
 
     // Validasi ruangan
@@ -77,55 +35,72 @@ export const createDoctorSchedule = async (req: Request, res: Response) => {
       where: { id: roomId },
     });
     if (!room) {
-      return res.status(404).json({ message: "Ruangan tidak ditemukan" });
+      return res.status(404).json({ status: false, statusCode: 404, message: "Ruangan tidak ditemukan" });
     }
 
-    // Cek jadwal yang sudah ada
-    const existingSchedule = await prisma.doctorSchedule.findFirst({
-      where: {
-        doctorId,
-        date: scheduleDate,
-      },
-    });
+    // Proses setiap jadwal
+    const createdSchedules = await Promise.all(schedules.map(async (schedule) => {
+      const { date, day, startTime, endTime, offlineQuota, onlineQuota, totalQuota } = schedule;
+      // const today = new Date();
+      // today.setHours(0, 0, 0, 0); // Set waktu ke 00:00:00
+      // const scheduleDate = new Date(date);
+      // scheduleDate.setHours(0, 0, 0, 0); // Set waktu ke 00:00:00
 
-    if (existingSchedule) {
-      return res
-        .status(400)
-        .json({ message: "Jadwal dokter untuk tanggal ini sudah ada" });
-    }
+      // console.log("Today:", today.toISOString());
+      // console.log("Schedule date:", scheduleDate.toISOString());
+      // if (scheduleDate < today) {
+      //   return res.status(400).json({ status: false, statusCode: 400, message: "Tanggal harus sama dengan atau melebihi tanggal hari ini" });
+      // }
 
-    // Buat jadwal dokter
-    const schedule = await prisma.doctorSchedule.create({
-      data: {
-        doctorId,
-        roomId,
-        date: scheduleDate,
-        day,
-        startTime,
-        endTime,
-        isActive,
-        totalQuota,
-        offlineQuota,
-        onlineQuota,
-        remainingOfflineQuota: offlineQuota,
-        remainingOnlineQuota: onlineQuota,
-      },
-    });
+      // // Validasi waktu
+      // const [startHour, startMinute] = startTime.split(":").map(Number);
+      // const [endHour, endMinute] = endTime.split(":").map(Number);
+      // if (startHour > endHour || (startHour === endHour && startMinute >= endMinute)) {
+      //   return res.status(400).json({ status: false, statusCode: 400, message: "Waktu mulai harus sebelum waktu selesai" });
+      // }
+
+      // Cek jadwal yang sudah ada
+      const existingSchedule = await prisma.doctorSchedule.findFirst({
+        where: {
+          doctorId,
+          date,
+        },
+      });
+
+      if (existingSchedule) {
+        return res.status(400).json({ status: false, statusCode: 400, message: `Jadwal dokter untuk tanggal ${date.toISOString().split('T')[0]} sudah ada` });
+      }
+
+      // Buat jadwal dokter
+      return prisma.doctorSchedule.create({
+        data: {
+          doctorId,
+          roomId,
+          date,
+          day,
+          startTime,
+          endTime,
+          isActive: true,
+          totalQuota,
+          offlineQuota,
+          onlineQuota,
+          remainingOfflineQuota: offlineQuota,
+          remainingOnlineQuota: onlineQuota,
+        },
+      });
+    }));
 
     return res.status(201).json({
+      status: true,
+      statusCode: 201,
       message: "Jadwal dokter berhasil dibuat",
-      data: schedule,
     });
   } catch (error: any) {
     console.error(error);
-    if (error.code === "P2002") {
-      return res
-        .status(400)
-        .json({ message: "Jadwal dokter untuk tanggal ini sudah ada" });
+    if (error instanceof Error) {
+      return res.status(400).json({ status: false, statusCode: 400, message: error.message });
     }
-    return res
-      .status(500)
-      .json({ message: "Terjadi kesalahan server internal" });
+    return res.status(500).json({ status: false, statusCode: 500, message: "Terjadi kesalahan server internal" });
   }
 };
 
