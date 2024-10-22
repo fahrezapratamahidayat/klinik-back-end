@@ -1,11 +1,20 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { Request, Response } from "express";
 import { validateInput } from "../../helpers/validation";
-import { createRoomValidation } from "../../validations/room-validation";
+import {
+  createRoomValidation,
+  updateRoomValidation,
+} from "../../validations/room-validation";
 import { generateRoomCode } from "../../utils/generate";
 import { ZodError } from "zod";
 const prisma = new PrismaClient();
 
+function getCustomErrorMessage(err: ZodError["errors"][number]): string {
+  if (err.message === "Required") {
+    return `${err.path.join(".")} harus diisi`;
+  }
+  return err.message;
+}
 
 export const createRoom = async (req: Request, res: Response) => {
   try {
@@ -103,28 +112,34 @@ export const createRoom = async (req: Request, res: Response) => {
         status: false,
         statusCode: 400,
         message: "Validasi gagal",
-        errors: error.errors.map(err => ({
-          field: err.path.join('.'),
-          message: err.message,
+        errors: error.errors.map((err) => ({
+          field: err.path.join("."),
+          message: getCustomErrorMessage(err),
         })),
       });
     } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
       let errorMessage = "Terjadi kesalahan saat membuat ruangan";
-      if (error.code === 'P2003') {
-        errorMessage = "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
+      if (error.code === "P2002") {
+        const target = (error.meta as { target: string[] })?.target?.[0] || "";
+        const fieldName = target.split("_")[1] || "field"; // Mengambil nama field dari target
+        errorMessage = `Ruangan dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
+      } else if (error.code === "P2003") {
+        errorMessage =
+          "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
       }
       res.status(400).json({
         status: false,
         statusCode: 400,
         message: errorMessage,
-        errorDetail: error
+        errorDetail: error,
       });
     } else {
       res.status(500).json({
         status: false,
         statusCode: 500,
         message: "Terjadi kesalahan internal server",
-        error: error instanceof Error ? error.message : "Kesalahan tidak diketahui",
+        error:
+          error instanceof Error ? error.message : "Kesalahan tidak diketahui",
       });
     }
   }
@@ -193,44 +208,111 @@ export const getRoomById = async (req: Request, res: Response) => {
 
 export const updateRoom = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const {
-    name,
-    alias,
-    description,
-    serviceClass,
-    installation,
-    operationalStatus,
-    longitude,
-    latitude,
-  } = req.body;
-  if (!validateInput(createRoomValidation, req, res)) return;
   try {
-    const room = await prisma.room.update({
+    const validatedData = updateRoomValidation.parse(req.body);
+
+    const roomData: any = { ...validatedData };
+    delete roomData.address;
+    delete roomData.telecom;
+    delete roomData.hoursOfOperation;
+
+    if (validatedData.address) {
+      roomData.address = {
+        update: {
+          use: validatedData.address.use,
+          line: validatedData.address.line,
+          city: validatedData.address.city,
+          postalCode: validatedData.address.postalCode,
+          country: validatedData.address.country,
+          extension: validatedData.address.extension
+            ? {
+                update: {
+                  provinceCode: validatedData.address.extension.provinceCode,
+                  districtCode: validatedData.address.extension.districtCode,
+                  subdistrictCode:
+                    validatedData.address.extension.subdistrictCode,
+                  villageCode: validatedData.address.extension.villageCode,
+                  rt: validatedData.address.extension.rt,
+                  rw: validatedData.address.extension.rw,
+                },
+              }
+            : undefined,
+        },
+      };
+    }
+
+    if (validatedData.telecom) {
+      roomData.telecom = {
+        deleteMany: {},
+        create: validatedData.telecom,
+      };
+    }
+
+    if (validatedData.hoursOfOperation) {
+      roomData.HoursOfOperation = {
+        deleteMany: {},
+        create: validatedData.hoursOfOperation,
+      };
+    }
+
+    const updatedRoom = await prisma.room.update({
       where: { id },
-      data: {
-        name,
-        alias,
-        description,
-        serviceClass,
-        installation,
-        operationalStatus,
-        longitude,
-        latitude,
+      data: roomData,
+      include: {
+        address: {
+          include: {
+            extension: true,
+          },
+        },
+        telecom: true,
+        HoursOfOperation: true,
       },
     });
+
     res.status(200).json({
       status: true,
       statusCode: 200,
-      message: "Room updated successfully",
-      data: room,
+      message: "Ruangan berhasil diperbarui",
+      data: updatedRoom,
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "Validasi gagal",
+        errors: error.errors.map((err) => ({
+          field: err.path.join("."),
+          message: getCustomErrorMessage(err),
+        })),
+      });
+    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      let errorMessage = "Terjadi kesalahan saat memperbarui ruangan";
+      if (error.code === "P2002") {
+        const target = (error.meta as { target: string[] })?.target?.[0] || "";
+        const fieldName = target.split("_")[1] || "field";
+        errorMessage = `Ruangan dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
+      } else if (error.code === "P2003") {
+        errorMessage =
+          "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
+      } else if (error.code === "P2025") {
+        errorMessage = "Ruangan tidak ditemukan";
+      }
+      res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: errorMessage,
+        errorDetail: error,
+      });
+    } else {
+      res.status(500).json({
+        status: false,
+        statusCode: 500,
+        message: "Terjadi kesalahan internal server",
+        error:
+          error instanceof Error ? error.message : "Kesalahan tidak diketahui",
+      });
+    }
   }
 };
 
