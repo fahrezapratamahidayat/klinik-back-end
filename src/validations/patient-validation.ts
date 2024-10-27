@@ -9,6 +9,7 @@ import {
   Religion,
   RelationshipType,
   RegistrationStatus,
+  EncounterType,
 } from "@prisma/client";
 
 export const createPatientValidation = z.object({
@@ -109,11 +110,25 @@ export const createNewbornPatientValidation = z.object({
 
 
 export const createPatientRegistrationValidation = z.object({
-  patientId: z.string(),
-  doctorId: z.string(),
-  roomId: z.string(),
-  paymentMethodId: z.string(),
-  status: z.nativeEnum(RegistrationStatus).default("draft").optional(),
-  scheduleId: z.string(),
-  isOnline: z.boolean(),
+  patientId: z.string({ required_error: "Pasien harus diisi" }),
+  doctorId: z.string({ required_error: "Dokter harus diisi" }),
+  roomId: z.string({ required_error: "Ruangan harus diisi" }),
+  paymentMethodId: z.string({ required_error: "Metode pembayaran harus diisi" }),
+  status: z.nativeEnum(RegistrationStatus, { required_error: "Status harus diisi" }).default("draft").optional(),
+  scheduleId: z.string({ required_error: "Jadwal harus diisi" }),
+  isOnline: z.boolean({ required_error: "Online harus diisi" }),
+  encounterType: z.nativeEnum(EncounterType, { required_error: "Tipe kunjungan harus diisi" }),
 });
+
+
+export const patientRegistrationStatusSchema = z.object({
+  patientRegistrationId: z
+    .string({
+      required_error: "ID registrasi pasien harus diisi",
+    })
+    .uuid({
+      message: "ID registrasi pasien harus berupa UUID",
+    }),
+  status: z.nativeEnum(RegistrationStatus, { required_error: "Status harus diisi" }),
+});
+

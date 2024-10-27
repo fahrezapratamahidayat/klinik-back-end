@@ -78,7 +78,7 @@ export const createDoctor = async (req: Request, res: Response) => {
       let errorMessage = "Terjadi kesalahan saat membuat dokter";
       if (error.code === "P2002") {
         const target = (error.meta as { target: string[] })?.target?.[0] || "";
-        const fieldName = target.split("_")[1] || "field"; // Mengambil nama field dari target
+        const fieldName = target.split("_")[1] || "field";
         errorMessage = `Dokter dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
       } else if (error.code === "P2003") {
         errorMessage =

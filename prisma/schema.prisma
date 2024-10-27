@@ -226,23 +226,11 @@ enum EncounterStatus {
   cancelled /// Kunjungan dibatalkan
 }
 
-enum AnamnesisType {
-  keluhan_utama
-  riwayat_penyakit
-  riwayat_alergi
-  riwayat_operasi
-  riwayat_pengobatan
-}
-
-enum AnamnesisCategory {
-  problem_list_item /// Problem List Item
-  encounter_diagnosis /// Encounter Diagnosis
-}
 
 model Encounter {
-  id                       String                     @id @default(uuid())
-  patientRegistrationId    String
-  patientRegistration      PatientRegistration        @relation(fields: [patientRegistrationId], references: [id], onDelete: Cascade)
+  id                       String                    @id @default(uuid())
+  patientRegistrationId    String                    @unique
+  patientRegistration      PatientRegistration       @relation(fields: [patientRegistrationId], references: [id], onDelete: Cascade)
   encounterType            EncounterType
   status                   EncounterStatus
   startDate                DateTime
@@ -250,123 +238,168 @@ model Encounter {
   diagnosis                String?
   treatmentPlan            String?
   notes                    String?
-  Anamnesis                Anamnesis[]
-  PhysicalExamination      PhysicalExamination[]
-  PsychologicalExamination PsychologicalExamination[]
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
+  anamnesis                Anamnesis?
+  physicalExamination      PhysicalExamination?
+  psychologicalExamination PsychologicalExamination?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 }
 
 model Anamnesis {
-  id                String            @id @default(uuid())
-  encounterId       String
-  encounter         Encounter         @relation(fields: [encounterId], references: [id])
-  anamnesisType     AnamnesisType
-  anamnesisCategory AnamnesisCategory
-  anamnesisValue    String?
-  anamnesisNote     String?
-  recordedDate      DateTime
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id          String    @id @default(uuid())
+  encounterId String    @unique
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  // Keluhan Utama
+  chiefComplaint      String?
+  durationOfComplaint String?
+  locationOfComplaint String?
+
+  // Riwayat Medis
+  currentIllnessHistory String?
+  pastMedicalHistory    String?
+  familyMedicalHistory  String?
+
+  // Riwayat Alergi
+  drugAllergyHistory  String?
+  foodAllergyHistory  String?
+  otherAllergyHistory String?
+
+  // Riwayat Pengobatan
+  medicationHistory  String?
+  currentMedications String?
+
+  // Riwayat Operasi
+  surgicalHistory String?
+
+  // Riwayat Gaya Hidup
+  smoking           Boolean?
+  cigarettesPerDay  Int?
+  alcohol           Boolean?
+  alcoholFrequency  String?
+  exercise          String?
+  exerciseFrequency String?
+
+  // Riwayat Ginekologi (untuk pasien wanita)
+  menarche             Int? // Usia menstruasi pertama
+  menstrualCycle       String?
+  menstruationDuration Int? // dalam hari
+  lastMenstrualPeriod  DateTime? // Periode Menstruasi Terakhir
+  parity               String? // Format: G(Gravida)P(Para)A(Abortus), contoh: G3P2A1
+
+  // Riwayat Kehamilan (jika hamil)
+  gestationalAge         Int? // dalam minggu
+  fetalMovement          String?
+  pregnancyComplications String?
+  deliveryHistory        String?
+
+  // Riwayat Imunisasi
+  immunizationHistory String?
+
+  // Riwayat Nutrisi
+  dietPattern String?
+  specialDiet String?
+
+  // Riwayat Tidur
+  sleepPattern  String?
+  sleepDuration Int? // dalam jam
+
+  // Pola Eliminasi
+  urinationPattern  String?
+  defecationPattern String?
+
+  // Informasi Tambahan
+  additionalInformation String?
+
+  recordedDate DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model PhysicalExamination {
-  id                String          @id @default(uuid())
-  encounterId       String
-  encounter         Encounter       @relation(fields: [encounterId], references: [id])
-  examinationType   ExaminationType
-  observationType   ObservationType
+  id          String    @id @default(uuid())
+  encounterId String    @unique
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  // Tanda Vital
+  bloodPressureSystolic  Int?
+  bloodPressureDiastolic Int?
+  bodyTemperature        Float?
+  heartRate              Int?
+  respiratoryRate        Int?
+
+  // Kesadaran
+  levelOfConsciousness String?
+
+  // Pemeriksaan Fisik
+  head         String? // kepala
+  eyes         String? // mata
+  ears         String? // telinga
+  nose         String? // hidung
+  mouth        String? // mulut
+  throat       String? // tenggorokan
+  neck         String? // leher
+  chest        String? // dada
+  lungs        String? // paru-paru
+  heart        String? // jantung
+  abdomen      String? // perut
+  extremities  String? // tangan dan kaki
+  skin         String? // kulit
+  neurological String? // saraf
+
+  // Antropometri
+  height          Float?
+  weight          Float?
+  bodySurfaceArea Float?
+
+  // Catatan
+  note String?
+
   effectiveDateTime DateTime
-  valueQuantity     Float?
-  valueUnit         String?
-  valueString       String?
-  valueCodeDisplay  String?
-  performerId       String?
-  performerName     String?
-  note              String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-}
-
-enum ExaminationType {
-  vital_signs
-  consciousness
-  head_to_toe
-  anthropometry
-}
-
-enum ObservationType {
-  blood_pressure_systolic
-  blood_pressure_diastolic
-  body_temperature
-  heart_rate
-  respiratory_rate
-  level_of_consciousness
-  head
-  eyes
-  ears
-  nose
-  mouth
-  throat
-  neck
-  chest
-  lungs
-  heart
-  abdomen
-  extremities
-  skin
-  neurological
-  height
-  weight
-  body_surface_area
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model PsychologicalExamination {
-  id                String        @id @default(uuid())
-  encounterId       String
-  encounter         Encounter     @relation(fields: [encounterId], references: [id])
-  examinationType   PsychExamType
+  id          String    @id @default(uuid())
+  encounterId String    @unique
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  mood                String? // mood
+  affect              String? // perasaan
+  behavior            String? // perilaku
+  thoughtContent      String? // isi pikiran
+  thoughtProcess      String? // proses pikiran
+  perception          String? // persepsi
+  cognition           String? // pemahaman
+  insight             String? // pemahaman diri
+  judgment            String? // penilaian
+  memory              String? // ingatan
+  attention           String? // perhatian
+  concentration       String? // konsentrasi
+  orientation         String? // orientasi
+  speech              String? // bicara
+  psychomotorActivity String? // aktivitas fisik
+  suicidalIdeation    String? // pemikiran bunuh diri
+  homicidalIdeation   String? // pemikiran bunuh diri
+  substanceUse        String? // penggunaan narkoba
+  copingMechanisms    String? // mekanisme menangani stres
+  socialSupport       String? // dukungan sosial
+  stressLevel         String? // tingkat stres
+  sleepPattern        String? // pola tidur
+  appetite            String? // nafsu makan
+  energyLevel         String? // tingkat energi
+  anxietyLevel        String? // tingkat kecemasan
+  depressionScreening String? // screening depresi
+  other               String? // lainnya
+
+  interpretasi String? // interpretasi
+  note         String? // catatan
+
   effectiveDateTime DateTime
-  valueString       String?
-  valueCodeDisplay  String?
-  interpretasi      String?
-  performerId       String?
-  performerName     String?
-  note              String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
-
-enum PsychExamType {
-  mood
-  affect
-  behavior
-  thought_content
-  thought_process
-  perception
-  cognition
-  insight
-  judgment
-  memory
-  attention
-  concentration
-  orientation
-  speech
-  psychomotor_activity
-  suicidal_ideation
-  homicidal_ideation
-  substance_use
-  coping_mechanisms
-  social_support
-  stress_level
-  sleep_pattern
-  appetite
-  energy_level
-  anxiety_level
-  depression_screening
-  other
-}
-
 // ------------------------------
 // 1. ADMIN
 // ------------------------------
@@ -501,7 +534,7 @@ model DoctorSchedule {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  @@unique([doctorId, date])
+  @@unique([doctorId, roomId, date, startTime, endTime])
 }
 
 model Patient {
@@ -537,9 +570,16 @@ model Patient {
   @@unique([name, birthDate, gender])
 }
 
+enum RegistrationType {
+  offline
+  online
+}
+
 model PatientRegistration {
   id                 String             @id @default(uuid())
   registrationNumber String             @unique
+  queueNumber        Int
+  registrationType   RegistrationType   @default(offline)
   patientId          String
   patient            Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctorId           String
@@ -550,7 +590,7 @@ model PatientRegistration {
   PaymentMethod      PaymentMethod?     @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
   registrationDate   DateTime
   status             RegistrationStatus @default(draft)
-  Encounter          Encounter[]
+  Encounter          Encounter?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
@@ -640,7 +680,7 @@ model Province {
   District         District[]
   AddressExtension AddressExtension[]
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  updatedAt        DateTime           @default(now()) @updatedAt
 }
 
 model District {
@@ -651,7 +691,7 @@ model District {
   Subdistrict      Subdistrict[]
   AddressExtension AddressExtension[]
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  updatedAt        DateTime           @default(now()) @updatedAt
 }
 
 model Subdistrict {
@@ -662,7 +702,7 @@ model Subdistrict {
   Village          Village[]
   AddressExtension AddressExtension[]
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  updatedAt        DateTime           @default(now()) @updatedAt
 }
 
 model Village {
@@ -672,5 +712,5 @@ model Village {
   subdistrict      Subdistrict        @relation(fields: [subdistrictCode], references: [code], onDelete: Cascade)
   AddressExtension AddressExtension[]
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  updatedAt        DateTime           @default(now()) @updatedAt
 }

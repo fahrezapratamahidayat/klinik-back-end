@@ -1,4 +1,5 @@
 import { Installation, PrismaClient } from "@prisma/client";
+import { endOfDay, startOfDay } from "date-fns";
 const prisma = new PrismaClient();
 
 export async function generateMedicalRecordNumber(): Promise<string> {
@@ -87,6 +88,28 @@ export async function generateRoomCode(installation: Installation): Promise<stri
   } catch (error) {
     console.error("Kesalahan saat membuat kode ruangan:", error);
     throw new Error("Gagal membuat kode ruangan");
+  }
+}
+
+export async function generateDailyQueueNumber(doctorId: string): Promise<number> {
+  try {
+    const today = startOfDay(new Date());
+    const todayEnd = endOfDay(today);
+
+    const queueNumber = await prisma.patientRegistration.count({
+      where: {
+        registrationDate: {
+          gte: today,
+          lte: todayEnd,
+        },
+        doctorId: doctorId,
+      },
+    }) + 1;
+
+    return queueNumber;
+  } catch (error) {
+    console.error("Kesalahan saat membuat nomor antrian harian:", error);
+    throw new Error("Gagal membuat nomor antrian harian");
   }
 }
 

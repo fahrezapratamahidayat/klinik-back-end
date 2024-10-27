@@ -3,10 +3,12 @@ import { LocationRoutes } from "./location-routes";
 import { MainRouter } from "./main-route";
 import { AdminRoutes } from "./admin-routes";
 import { PendaftaranRoutes } from "./pendaftaran-routes";
+import { PerawatRoutes } from "./perawat-routes";
 
 const _routes: Array<[string, Router]> = [
     ['/', MainRouter],
     ['/api/pendaftaran', PendaftaranRoutes],
+    ['/api/perawat', PerawatRoutes],
     ['/api/admin', AdminRoutes],
     ['/api/locations', LocationRoutes]
 ]

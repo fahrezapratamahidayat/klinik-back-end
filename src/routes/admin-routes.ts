@@ -1,7 +1,7 @@
 import { RequestHandler, Router } from "express";
 import { createDoctor, deleteDoctor, getDoctorById, getDoctors, updateDoctor } from "../controllers/admin/doctor-controller";
 import { createRoom, deleteRoom, getRoomById, getRooms, updateRoom } from "../controllers/admin/room-controller";
-import { createDoctorSchedule,getDoctorSchedules,getDoctorScheduleById } from "../controllers/admin/doctor-schedule-controller";
+import { createDoctorSchedule,getDoctorSchedules,getDoctorScheduleById, deleteDoctorSchedule, updateDoctorSchedule } from "../controllers/admin/doctor-schedule-controller";
 
 export const AdminRoutes: Router = Router();
 
@@ -23,3 +23,5 @@ AdminRoutes.delete("/room/:id", deleteRoom as RequestHandler);
 AdminRoutes.post("/doctor-schedule", createDoctorSchedule as RequestHandler);
 AdminRoutes.get("/doctor-schedule", getDoctorSchedules as RequestHandler);
 AdminRoutes.get("/doctor-schedule/:id", getDoctorScheduleById as RequestHandler);
+AdminRoutes.delete("/doctor-schedule/:id", deleteDoctorSchedule as RequestHandler);
+AdminRoutes.put("/doctor-schedule/:id", updateDoctorSchedule as RequestHandler);

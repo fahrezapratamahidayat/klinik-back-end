@@ -9,6 +9,7 @@ import { Request, Response } from "express";
 import { generateMedicalRecordNumber } from "../../utils/generate";
 import { validateInput } from "../../helpers/validation";
 import { createNewbornPatientValidation, createPatientValidation } from "../../validations/patient-validation";
+import { endOfDay, parseISO, startOfDay } from "date-fns";
 const prisma = new PrismaClient();
 
 export const createPatient = async (req: Request, res: Response) => {
@@ -41,14 +42,14 @@ export const createPatient = async (req: Request, res: Response) => {
       if (name.length < 3 || !birthDate || !gender) {
         return res
           .status(400)
-          .json({ message: "Data tidak lengkap untuk pasien tanpa NIK" });
+          .json({ status: false, statusCode: 400, message: "Data tidak lengkap untuk pasien tanpa NIK" });
       }
     } else if (identifierType === IdentifierType.nik) {
       if (!identifier || identifier.length !== 16) {
-        return res.status(400).json({ message: "NIK tidak valid" });
+        return res.status(400).json({ status: false, statusCode: 400, message: "NIK tidak valid" });
       }
     } else {
-      return res.status(400).json({ message: "Tipe identifier tidak valid" });
+      return res.status(400).json({ status: false, statusCode: 400, message: "Tipe identifier tidak valid" });
     }
 
     // Check if identifier already exists (hanya untuk pasien dengan NIK)
@@ -60,7 +61,7 @@ export const createPatient = async (req: Request, res: Response) => {
       if (existingPatient) {
         return res
           .status(400)
-          .json({ message: "Pasien dengan NIK tersebut sudah ada" });
+          .json({ status: false, statusCode: 400, message: "Pasien dengan NIK tersebut sudah ada" });
       }
     }
     const medicalRecordNumber = await generateMedicalRecordNumber();
@@ -119,12 +120,16 @@ export const createPatient = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({
+      status: true,
+      statusCode: 201,
       message: "Pasien berhasil dibuat",
-      data: newPatient,
+      data: {
+        id: newPatient.id,
+      }
     });
   } catch (error) {
     console.error("Kesalahan saat membuat pasien:", error);
-    res.status(500).json({ message: "Terjadi kesalahan saat membuat pasien" });
+    res.status(500).json({status: false, statusCode: 500, message: "Terjadi kesalahan saat membuat pasien" });
   }
 };
 
@@ -238,7 +243,24 @@ export const createNewbornPatient = async (req: Request, res: Response) => {
 
 export const getAllPatients = async (req: Request, res: Response) => {
   try {
+    const { from, to } = req.query;
+    let startDate: Date;
+    let endDate: Date;
+
+    if (from) {
+      startDate = startOfDay(parseISO(from as string));
+      endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(new Date());
+    } else {
+      startDate = new Date(0);
+      endDate = new Date();
+    }
     const patients = await prisma.patient.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
       select: {
         id: true,
         medicalRecordNumber: true,
@@ -261,6 +283,26 @@ export const getAllPatients = async (req: Request, res: Response) => {
                 districtCode: false,
                 subdistrictCode: false,
                 villageCode: false,
+                province: {
+                  select: {
+                    name: true,
+                  },
+                },
+                district: {
+                  select: {
+                    name: true,
+                  },
+                },
+                subdistrict: {
+                  select: {
+                    name: true,
+                  },
+                },
+                village: {
+                  select: {
+                    name: true,
+                  },
+                },
                 rt: true,
                 rw: true,
               },
@@ -270,9 +312,20 @@ export const getAllPatients = async (req: Request, res: Response) => {
         createdAt: true,
         updatedAt: true,
       },
+      orderBy: [{ createdAt: "desc" }],
     });
+    if(patients.length === 0) {
+      return res.status(404).json({
+        status: false,
+        statusCode: 404,
+        message: "Tidak ada pasien yang ditemukan",
+        data: [],
+      });
+    }
 
     res.status(200).json({
+      status: true,
+      statusCode: 200,
       message: "Daftar semua pasien berhasil diambil",
       data: patients,
     });
@@ -280,7 +333,11 @@ export const getAllPatients = async (req: Request, res: Response) => {
     console.error("Kesalahan saat mengambil daftar pasien:", error);
     res
       .status(500)
-      .json({ message: "Terjadi kesalahan saat mengambil daftar pasien" });
+      .json({
+        status: false,
+        statusCode: 500,
+        message: "Terjadi kesalahan saat mengambil daftar pasien",
+      });
   }
 };
 
@@ -327,15 +384,45 @@ export const getPatientById = async (req: Request, res: Response) => {
     });
 
     if (!patient) {
-      return res.status(404).json({ message: "Pasien tidak ditemukan" });
+      return res.status(404).json({
+        status: false,
+        statusCode: 404,
+        message: "Pasien tidak ditemukan",
+      });
     }
 
     res.status(200).json({
+      status: true,
+      statusCode: 200,
       message: "Data pasien ditemukan",
       data: patient,
     });
   } catch (error) {
     console.error("Kesalahan saat mencari pasien:", error);
-    res.status(500).json({ message: "Terjadi kesalahan saat mencari pasien" });
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Terjadi kesalahan saat mencari pasien",
+    });
   }
 };
+
+export const deletePatient = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.patient.delete({ where: { id } });
+    return res.status(200).json({
+      status: true,
+      statusCode: 200,
+      message: "Pasien berhasil dihapus",
+    });
+  } catch (error: any) {
+    console.error("Kesalahan saat menghapus pasien:", error);
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Terjadi kesalahan saat menghapus pasien",
+      errors: error.message
+    });
+  }
+}

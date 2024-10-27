@@ -1,167 +1,13 @@
 import { PrismaClient, RegistrationStatus } from "@prisma/client";
-import { Request, Response } from "express";
-import { createPatientRegistrationValidation, patientRegistrationStatusSchema } from "../../validations/patient-validation";
-import {
-  generateDailyQueueNumber,
-  generateRegistrationId,
-} from "../../utils/generate";
 import { endOfDay, format, parseISO, startOfDay } from "date-fns";
+import { Request, Response } from "express";
+import { patientRegistrationStatusSchema } from "../../validations/patient-validation";
 import { id } from "date-fns/locale";
+import { UpdateEncounterSchema } from "../../validations/encounter-validation";
 
 const prisma = new PrismaClient();
-export const createPatientRegistration = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const {
-      patientId,
-      doctorId,
-      roomId,
-      paymentMethodId,
-      scheduleId,
-      isOnline,
-      encounterType,
-    } = createPatientRegistrationValidation.parse(req.body);
 
-    // Periksa keberadaan pasien, dokter, dan metode pembayaran
-    const [patient, doctor, paymentMethod] = await Promise.all([
-      prisma.patient.findUnique({ where: { id: patientId } }),
-      prisma.doctor.findUnique({ where: { id: doctorId } }),
-      prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
-    ]);
-
-    if (!patient)
-      return res.status(404).json({
-        status: false,
-        statusCode: 404,
-        message: "Pasien tidak ditemukan",
-      });
-    if (!doctor)
-      return res.status(404).json({
-        status: false,
-        statusCode: 404,
-        message: "Dokter tidak ditemukan",
-      });
-    if (!paymentMethod)
-      return res.status(404).json({
-        status: false,
-        statusCode: 404,
-        message: "Metode pembayaran tidak ditemukan",
-      });
-
-    // Periksa jadwal dokter
-    const doctorSchedule = await prisma.doctorSchedule.findUnique({
-      where: { id: scheduleId },
-    });
-
-    if (!doctorSchedule || !doctorSchedule.isActive) {
-      return res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Jadwal dokter tidak tersedia",
-      });
-    }
-
-    // Validasi jadwal dokter untuk hari ini
-    const today = new Date();
-    const currentTime = today.toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    if (doctorSchedule.date.toDateString() !== today.toDateString()) {
-      return res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Jadwal dokter tidak tersedia untuk hari ini",
-      });
-    }
-
-    // Validasi waktu pendaftaran
-    if (
-      currentTime < doctorSchedule.startTime ||
-      currentTime > doctorSchedule.endTime
-    ) {
-      return res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Waktu pendaftaran di luar jadwal praktik dokter",
-      });
-    }
-
-    // Periksa kuota yang tersedia
-    const availableQuota = isOnline
-      ? doctorSchedule.remainingOnlineQuota
-      : doctorSchedule.remainingOfflineQuota;
-
-    if (availableQuota <= 0) {
-      return res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: `Kuota ${
-          isOnline ? "online" : "offline"
-        } untuk jadwal ini telah habis`,
-      });
-    }
-
-    const queueNumber = await generateDailyQueueNumber(doctorId);
-    const formattedDate = format(new Date(), "dd MMMM yyyy", { locale: id });
-
-    // Buat registrasi pasien
-    const registrationNumber = await generateRegistrationId();
-    const patientRegistration = await prisma.patientRegistration.create({
-      data: {
-        patientId,
-        doctorId,
-        roomId,
-        paymentMethodId,
-        registrationNumber,
-        registrationDate: new Date(),
-        queueNumber,
-      },
-    });
-
-    // Create Encounter
-    const encounter = await prisma.encounter.create({
-      data: {
-        patientRegistrationId: patientRegistration.id,
-        encounterType,
-        status: "planned",
-        startDate: new Date(),
-      },
-    });
-
-    // Update kuota yang tersisa
-    await prisma.doctorSchedule.update({
-      where: { id: scheduleId },
-      data: {
-        remainingOnlineQuota: isOnline
-          ? doctorSchedule.remainingOnlineQuota - 1
-          : doctorSchedule.remainingOnlineQuota,
-        remainingOfflineQuota: !isOnline
-          ? doctorSchedule.remainingOfflineQuota - 1
-          : doctorSchedule.remainingOfflineQuota,
-      },
-    });
-
-    res.status(201).json({
-      status: true,
-      statusCode: 201,
-      message: "Registrasi pasien berhasil dibuat",
-      data: patientRegistration,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Terjadi kesalahan server internal",
-    });
-  }
-};
-
-export const getPatientRegistrations = async (req: Request, res: Response) => {
+export const getPatientRegistration = async (req: Request, res: Response) => {
   try {
     const { from, to } = req.query;
     let startDate: Date;
@@ -174,9 +20,9 @@ export const getPatientRegistrations = async (req: Request, res: Response) => {
       startDate = new Date(0);
       endDate = new Date();
     }
-
-    const patientRegistrations = await prisma.patientRegistration.findMany({
+    const patientRegistration = await prisma.patientRegistration.findMany({
       where: {
+        status: "dalam_antrian",
         registrationDate: {
           gte: startDate,
           lte: endDate,
@@ -220,30 +66,13 @@ export const getPatientRegistrations = async (req: Request, res: Response) => {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: [{ registrationDate: "desc" }, { queueNumber: "asc" }],
     });
 
-    const formattedRegistrations = patientRegistrations.map((reg) => ({
-      ...reg,
-      registrationDate: format(reg.registrationDate, "dd MMMM yyyy HH:mm", {
-        locale: id,
-      }),
-      patient: {
-        ...reg.patient,
-        birthDate: format(reg.patient.birthDate, "dd MMMM yyyy", {
-          locale: id,
-        }),
-      },
-      createdAt: format(reg.createdAt, "dd MMMM yyyy HH:mm", { locale: id }),
-      updatedAt: format(reg.updatedAt, "dd MMMM yyyy HH:mm", { locale: id }),
-    }));
-
-    if (formattedRegistrations.length === 0) {
+    if (patientRegistration.length === 0) {
       return res.status(404).json({
         status: false,
         statusCode: 404,
-        message:
-          "Pendaftaran pasien tidak ditemukan untuk rentang waktu yang dipilih",
+        message: "Data tidak ditemukan",
         data: [],
       });
     }
@@ -251,15 +80,16 @@ export const getPatientRegistrations = async (req: Request, res: Response) => {
     res.status(200).json({
       status: true,
       statusCode: 200,
-      message: "Pendaftaran pasien ditemukan",
-      data: formattedRegistrations,
+      message: "Berhasil mengambil data pasien dalam antrian",
+      data: patientRegistration,
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       status: false,
       statusCode: 500,
-      message: "Terjadi kesalahan server internal",
-      error: error.message,
+      message: "Gagal mengambil data pasien dalam antrian",
+      data: [],
+      error: error,
     });
   }
 };
@@ -268,31 +98,41 @@ export const getPatientRegistrationById = async (
   req: Request,
   res: Response
 ) => {
-  const { id } = req.params;
   try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "ID pasien dalam antrian tidak ditemukan",
+      });
+    }
     const patientRegistration = await prisma.patientRegistration.findUnique({
       where: {
-        id,
+        id: id,
       },
       select: {
         id: true,
         registrationNumber: true,
         registrationDate: true,
-        queueNumber: true,
         status: true,
         registrationType: true,
         patient: {
           select: {
             id: true,
-            name: true,
-            medicalRecordNumber: true,
             identifierType: true,
+            medicalRecordNumber: true,
+            name: true,
             gender: true,
-            birthPlace: true,
             birthDate: true,
-            bloodType: true,
+            birthPlace: true,
             maritalStatus: true,
+            bloodType: true,
+            education: true,
+            citizenshipStatus: true,
             religion: true,
+            responsiblePersonName: true,
+            responsiblePersonPhone: true,
             telecom: true,
             address: {
               select: {
@@ -301,7 +141,6 @@ export const getPatientRegistrationById = async (
                 line: true,
                 city: true,
                 postalCode: true,
-                country: true,
                 extension: {
                   select: {
                     id: true,
@@ -347,96 +186,273 @@ export const getPatientRegistrationById = async (
             installation: true,
           },
         },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         createdAt: true,
         updatedAt: true,
       },
     });
-    if (!patientRegistration)
+    if (!patientRegistration) {
       return res.status(404).json({
         status: false,
         statusCode: 404,
-        message: "Patient registration not found",
-        data: null,
-        total: 0,
+        message: "Data pasien dalam antrian tidak ditemukan",
       });
+    }
+
     res.status(200).json({
       status: true,
       statusCode: 200,
-      message: "Patient registration found",
+      message: "Berhasil mengambil data pasien dalam antrian",
       data: patientRegistration,
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Gagal mengambil data pasien dalam antrian",
+      error: error,
+    });
   }
 };
 
-export const deletePatientRegistration = async (
-  req: Request,
-  res: Response
-) => {
-  const { id } = req.params;
+
+export const getHistoryEncounter = async (req: Request, res: Response) => {
   try {
-    const registration = await prisma.patientRegistration.findUnique({
-      where: { id },
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "ID pasien tidak ditemukan",
+      });
+    }
+
+    const historyEncounters = await prisma.encounter.findMany({
+      where: {
+        patientRegistration: {
+          patient: {
+            id: id
+          }
+        },
+      },
       include: {
-        doctor: {
+        patientRegistration: {
           include: {
-            doctorSchedule: {
-              where: {
-                date: {
-                  gte: startOfDay(new Date()),
-                  lte: endOfDay(new Date()),
-                },
+            patient: {
+              select: {
+                id: true,
+                name: true,
+                medicalRecordNumber: true,
+              },
+            },
+            doctor: {
+              select: {
+                id: true,
+                name: true,
+                specialization: true,
+              },
+            },
+            room: {
+              select: {
+                id: true,
+                name: true,
+                installation: true,
               },
             },
           },
         },
+        anamnesis: true,
+        physicalExamination: true,
+        psychologicalExamination: true,
+      },
+      orderBy: {
+        startDate: "asc",
       },
     });
 
-    if (!registration) {
+    if (historyEncounters.length === 0) {
       return res.status(404).json({
         status: false,
         statusCode: 404,
-        message: "Registrasi pasien tidak ditemukan",
-      });
-    }
-
-    const deletedRegistration = await prisma.patientRegistration.delete({
-      where: { id },
-    });
-
-    if (registration.doctor.doctorSchedule.length > 0) {
-      const schedule = registration.doctor.doctorSchedule[0];
-      const isOnline = registration.registrationType === "online";
-
-      await prisma.doctorSchedule.update({
-        where: { id: schedule.id },
-        data: {
-          remainingOnlineQuota: isOnline ? { increment: 1 } : undefined,
-          remainingOfflineQuota: !isOnline ? { increment: 1 } : undefined,
-        },
+        message: "Riwayat kunjungan pasien tidak ditemukan",
+        data: [],
       });
     }
 
     res.status(200).json({
       status: true,
       statusCode: 200,
-      message:
-        "Registrasi pasien berhasil dihapus dan slot jadwal dikembalikan",
-      data: deletedRegistration,
+      message: "Berhasil mengambil riwayat kunjungan pasien",
+      data: historyEncounters,
     });
   } catch (error: any) {
     res.status(500).json({
       status: false,
       statusCode: 500,
-      message: "Terjadi kesalahan server internal",
+      message: "Terjadi kesalahan saat mengambil riwayat kunjungan pasien",
+      error: error.message,
+    });
+  }
+};
+
+export const getEncounterPatientRegistrationById = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const encounter = await prisma.encounter.findUnique({
+        where: {
+            patientRegistrationId: id
+        },
+        include: {
+          patientRegistration: {
+            include: {
+              patient: {
+                select: {
+                  id: true,
+                  name: true,
+                  medicalRecordNumber: true,
+                },
+              },
+              doctor: {
+                select: {
+                  id: true,
+                  name: true,
+                  specialization: true,
+                },
+              },
+              room: {
+                select: {
+                  id: true,
+                  name: true,
+                  installation: true,
+                },
+              },
+            },
+          },
+          anamnesis: true,
+          physicalExamination: true,
+          psychologicalExamination: true,
+        },
+    })
+    if (!encounter) {
+        return res.status(404).json({
+            status: false,
+            statusCode: 404,
+            message: "Data kunjungan pasien tidak ditemukan",
+        })
+    }
+    res.status(200).json({
+        status: true,
+        statusCode: 200,
+        message: "Berhasil mengambil data kunjungan pasien",
+        data: encounter
+    })
+}
+
+export const updateEncounterPatientRegistration = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+    // Validasi input
+    const validationResult = UpdateEncounterSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      return res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "Data tidak valid",
+        errors: validationResult.error.errors.map((error) => ({
+          path: error.path.join("."),
+          message: error.message,
+        })),
+      });
+    }
+
+    const validatedData = validationResult.data;
+
+    // Memperbarui encounter
+    const updatedEncounter = await prisma.encounter.update({
+      where: { patientRegistrationId: id },
+      data: {
+        status: validatedData.status,
+        endDate: validatedData.endDate
+          ? new Date(validatedData.endDate)
+          : undefined,
+        diagnosis: validatedData.diagnosis,
+        treatmentPlan: validatedData.treatmentPlan,
+        notes: validatedData.notes,
+        anamnesis: validatedData.anamnesis
+          ? {
+              upsert: {
+                create: {
+                  ...validatedData.anamnesis,
+                  recordedDate: new Date(),
+                  lastMenstrualPeriod: validatedData.anamnesis.lastMenstrualPeriod ? new Date(validatedData.anamnesis.lastMenstrualPeriod) : undefined,
+                },
+                update: {
+                  ...validatedData.anamnesis,
+                  recordedDate: new Date(),
+                  lastMenstrualPeriod: validatedData.anamnesis.lastMenstrualPeriod ? new Date(validatedData.anamnesis.lastMenstrualPeriod) : undefined,
+                },
+              },
+            }
+          : undefined,
+        physicalExamination: validatedData.physicalExamination
+          ? {
+              upsert: {
+                create: {
+                  ...validatedData.physicalExamination,
+                  effectiveDateTime: new Date(),
+                },
+                update: {
+                  ...validatedData.physicalExamination,
+                  effectiveDateTime: new Date(),
+                },
+              },
+            }
+          : undefined,
+        psychologicalExamination: validatedData.psychologicalExamination
+          ? {
+              upsert: {
+                create: {
+                  ...validatedData.psychologicalExamination,
+                  effectiveDateTime: new Date(),
+                },
+                update: {
+                  ...validatedData.psychologicalExamination,
+                  effectiveDateTime: new Date(),
+                },
+              },
+            }
+          : undefined,
+      },
+      include: {
+        anamnesis: true,
+        physicalExamination: true,
+        psychologicalExamination: true,
+      },
+    });
+
+    if (!updatedEncounter) {
+      return res.status(404).json({
+        status: false,
+        statusCode: 404,
+        message: "Encounter tidak ditemukan",
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      statusCode: 200,
+      message: "Encounter berhasil diperbarui",
+      data: updatedEncounter,
+    });
+  } catch (error: any) {
+    console.error("Kesalahan saat memperbarui encounter:", error);
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Terjadi kesalahan saat memperbarui encounter",
       error: error.message,
     });
   }
@@ -448,7 +464,7 @@ export const updatePatientRegistrationStatus = async (
 ) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({
         status: false,
@@ -456,7 +472,7 @@ export const updatePatientRegistrationStatus = async (
         message: "ID registrasi pasien tidak valid",
       });
     }
-  
+
     const validateData = patientRegistrationStatusSchema.safeParse(req.body);
     if (!validateData.success) {
       return res.status(400).json({
@@ -475,23 +491,20 @@ export const updatePatientRegistrationStatus = async (
       data: { status: validateData.data.status as RegistrationStatus },
     });
 
-   if (!updatedRegistration) {
+    if (!updatedRegistration) {
       return res.status(404).json({
         status: false,
         statusCode: 404,
         message: "Registrasi pasien tidak ditemukan",
       });
     }
-
-    // await prisma.encounter.updateMany({
-    //   where: { patientRegistrationId: id },
-    //   data: { status: "in_progress" },
-    // });
-
     res.status(200).json({
       status: true,
       statusCode: 200,
-      message: `Status registrasi pasien berhasil diperbarui menjadi ${validateData.data.status.replace("_", " ").charAt(0).toUpperCase() + validateData.data.status.replace("_", " ").slice(1)}`,
+      message: `Status registrasi pasien berhasil diperbarui menjadi ${
+        validateData.data.status.replace("_", " ").charAt(0).toUpperCase() +
+        validateData.data.status.replace("_", " ").slice(1)
+      }`,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -515,9 +528,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
           gte: startOfToday,
           lte: endOfToday,
         },
-        status: {
-          in: ['draft']
-        }
+        status: "dalam_antrian",
       },
       include: {
         patient: {
