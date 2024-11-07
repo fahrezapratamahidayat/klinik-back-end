@@ -13,7 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum KlinikRole {
+enum UserRole {
   Admin
   Pendaftaran
   Perawat
@@ -226,6 +226,70 @@ enum EncounterStatus {
   cancelled /// Kunjungan dibatalkan
 }
 
+enum MedicineCategory {
+  ANALGESIK /// Obat pereda nyeri
+  ANTIBIOTIK /// Antibiotik
+  ANTIDIABETES /// Obat diabetes
+  ANTIHIPERTENSI /// Obat tekanan darah tinggi
+  ANTIHISTAMIN /// Obat alergi
+  VITAMIN /// Vitamin dan suplemen
+  LAINNYA /// Kategori lainnya
+}
+
+enum MedicineForm {
+  TABLET /// Tablet
+  KAPSUL /// Kapsul
+  SIRUP /// Sirup
+  SALEP /// Salep
+  DROPS /// Tetes
+  INJEKSI /// Suntikan
+  SUPPOSITORIA /// Suppositoria
+  INHALER /// Inhaler
+  LAINNYA /// Bentuk lainnya
+}
+
+enum PrescriptionStatus {
+  draft /// Draft resep
+  confirmed /// Resep dikonfirmasi dokter
+  processed /// Sedang diproses farmasi
+  dispensed /// Obat telah diserahkan
+  cancelled /// Resep dibatalkan
+}
+
+enum MedicineUnit {
+  TABLET /// Tablet
+  KAPSUL /// Kapsul
+  ML /// Mililiter
+  MG /// Miligram
+  GRAM /// Gram
+  SACHET /// Sachet
+  BOTOL /// Botol
+  AMPUL /// Ampul
+  PCS /// Pieces
+  TUBE /// Tube
+}
+
+enum MedicineTransactionType {
+  IN /// Penambahan stok
+  OUT /// Pengurangan stok
+  ADJUSTMENT /// Penyesuaian stok
+  EXPIRED /// Obat kadaluarsa
+  DAMAGED /// Obat rusak
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  email        String    @unique
+  password     String
+  role         UserRole
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  refreshToken String?
+  doctor       Doctor?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
 
 model Encounter {
   id                       String                    @id @default(uuid())
@@ -243,12 +307,28 @@ model Encounter {
   psychologicalExamination PsychologicalExamination?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
+  EncounterTimeline        EncounterTimeline[]
+  Prescriptions            Prescriptions[]
+}
+
+model EncounterTimeline {
+  id          String             @id @default(uuid())
+  encounterId String
+  encounter   Encounter          @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  status      RegistrationStatus
+  timestamp   DateTime
+  performedBy String
+  notes       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([encounterId])
 }
 
 model Anamnesis {
   id          String    @id @default(uuid())
   encounterId String    @unique
-  encounter   Encounter @relation(fields: [encounterId], references: [id])
+  encounter   Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
 
   // Keluhan Utama
   chiefComplaint      String?
@@ -319,38 +399,40 @@ model Anamnesis {
 model PhysicalExamination {
   id          String    @id @default(uuid())
   encounterId String    @unique
-  encounter   Encounter @relation(fields: [encounterId], references: [id])
+  encounter   Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
 
   // Tanda Vital
-  bloodPressureSystolic  Int?
-  bloodPressureDiastolic Int?
-  bodyTemperature        Float?
-  heartRate              Int?
-  respiratoryRate        Int?
+  bloodPressureSystolic  Int? // Tekanan darah sistol
+  bloodPressureDiastolic Int? // Tekanan darah diastol
+  bodyTemperature        Float? // Suhu tubuh
+  heartRate              Int? // Denyut nadi
+  respiratoryRate        Int? // Laju pernapasan
 
   // Kesadaran
-  levelOfConsciousness String?
+  levelOfConsciousness String? // Kesadaran (baik/sedang/buruk)
+
+  generalCondition String? // Keadaan umum (baik/sedang/buruk)
 
   // Pemeriksaan Fisik
-  head         String? // kepala
-  eyes         String? // mata
-  ears         String? // telinga
-  nose         String? // hidung
-  mouth        String? // mulut
-  throat       String? // tenggorokan
-  neck         String? // leher
-  chest        String? // dada
-  lungs        String? // paru-paru
-  heart        String? // jantung
-  abdomen      String? // perut
-  extremities  String? // tangan dan kaki
-  skin         String? // kulit
-  neurological String? // saraf
+  head         String? // kepala (benjolan, nyeri tekan, dll)
+  eyes         String? // mata (konjungtiva, sklera, dll)
+  ears         String? // telinga (serumen, nyeri, dll)
+  nose         String? // hidung (sekret, polip, dll)
+  mouth        String? // mulut (lidah, gigi, dll)
+  throat       String? // tenggorokan (faring, tonsil, dll)
+  neck         String? // leher (JVP, kelenjar getah bening, dll)
+  chest        String? // dada (simetris/asimetris, retraksi)
+  lungs        String? // paru (suara napas, ronkhi, wheezing)
+  heart        String? // jantung (suara jantung, gallop, murmur)
+  abdomen      String? // perut (nyeri tekan, masa, organomegali)
+  extremities  String? // ekstremitas (edema, varises, sianosis)
+  skin         String? // kulit (ruam, lesi, warna)
+  neurological String? // neurologis (refleks, kekuatan otot)
 
-  // Antropometri
-  height          Float?
-  weight          Float?
-  bodySurfaceArea Float?
+  // Antropometri 
+  height          Float? // Tinggi badan
+  weight          Float? // Berat badan
+  bodySurfaceArea Float? // IMT
 
   // Catatan
   note String?
@@ -363,7 +445,7 @@ model PhysicalExamination {
 model PsychologicalExamination {
   id          String    @id @default(uuid())
   encounterId String    @unique
-  encounter   Encounter @relation(fields: [encounterId], references: [id])
+  encounter   Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
 
   mood                String? // mood
   affect              String? // perasaan
@@ -400,11 +482,78 @@ model PsychologicalExamination {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
-// ------------------------------
-// 1. ADMIN
-// ------------------------------
+
+model Medicine {
+  id                  String                @id @default(uuid())
+  code                String                @unique /// Kode obat
+  name                String /// Nama obat
+  genericName         String? /// Nama generik
+  category            MedicineCategory
+  form                MedicineForm
+  unit                MedicineUnit
+  composition         String? /// Komposisi obat
+  manufacturer        String? /// Pabrikan
+  description         String? /// Deskripsi/kegunaan
+  indication          String? /// Indikasi
+  contraindication    String? /// Kontraindikasi
+  sideEffect          String? /// Efek samping
+  doseRange           String? /// Rentang dosis yang direkomendasikan
+  storageMethod       String? /// Cara penyimpanan
+  price               Float /// Harga jual
+  stock               Int /// Stok tersedia
+  minimumStock        Int /// Stok minimum
+  expiryDate          DateTime? /// Tanggal kadaluarsa
+  bpjsCode            String?               @unique /// Kode BPJS
+  isActive            Boolean               @default(true)
+  prescriptions       Prescriptions[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  MedicineTransaction MedicineTransaction[]
+}
+
+model Prescriptions {
+  id                 String             @id @default(uuid())
+  prescriptionNumber String             @unique /// Nomor resep
+  encounterId        String /// ID kunjungan
+  encounter          Encounter          @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  medicine           Medicine           @relation(fields: [medicineId], references: [id])
+  medicineId         String
+  quantity           Int /// Jumlah obat
+  dosage             String /// Dosis (misal: 3x1)
+  route              String /// Rute pemberian (oral, topical, dll)
+  frequency          String /// Frekuensi pemberian
+  duration           Int /// Durasi penggunaan (dalam hari)
+  notes              String? /// Catatan tambahan
+  status             PrescriptionStatus @default(draft)
+  dispensedAt        DateTime? /// Waktu obat diserahkan
+  dispensedBy        String? /// Petugas yang menyerahkan
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([encounterId])
+}
+
+model MedicineTransaction {
+  id              String                  @id @default(uuid())
+  transactionType MedicineTransactionType
+  medicineId      String
+  medicine        Medicine                @relation(fields: [medicineId], references: [id])
+  quantity        Int
+  price           Float
+  batchNumber     String? /// Nomor batch
+  expiryDate      DateTime? /// Tanggal kadaluarsa batch
+  notes           String?
+  performedBy     String /// Petugas yang melakukan transaksi
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([medicineId])
+}
+
 model Doctor {
   id                  String                @id @default(uuid())
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String                @unique
   name                String
   gender              Gender
   birthDate           DateTime
