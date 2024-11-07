@@ -52,9 +52,13 @@ app.get('/token', async (req, res) => {
 app.get('/payment-methods', async (req, res) => {
   try {
     const paymentMethods = await prisma.paymentMethod.findMany();
-    res.json(paymentMethods);
+    if (!paymentMethods || paymentMethods.length === 0) {
+      res.status(404).json({ status: false, statusCode: 404, message: 'Metode pembayaran tidak ditemukan', data: [] });
+    } else {
+      res.json({ status: true, statusCode: 200, message: 'Metode pembayaran ditemukan', data: paymentMethods });
+    }
   } catch (error) {
-    res.status(500).json({ error: 'Terjadi kesalahan saat mengambil metode pembayaran' });
+    res.status(500).json({ status: false, statusCode: 500, message: 'Terjadi kesalahan saat mengambil metode pembayaran', data: [] });
   }
 });
 
