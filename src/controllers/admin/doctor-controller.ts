@@ -10,6 +10,7 @@ import {
   updateDoctorValidation,
 } from "../../validations/doctor-validation";
 import { ZodError } from "zod";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
@@ -23,7 +24,32 @@ function getCustomErrorMessage(err: ZodError["errors"][number]): string {
 export const createDoctor = async (req: Request, res: Response) => {
   try {
     const validatedData = createDoctorValidation.parse(req.body);
-    const { address, telecom, ...doctorInfo } = validatedData;
+    const { address, telecom, username, email, password, confirmPassword, ...doctorInfo } = validatedData;
+
+    // validasi email sudah terdaftar
+    const checkEmail = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (checkEmail) {
+      return res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "Email sudah terdaftar",
+      });
+    }
+    
+    // Validasi password
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        status: false,
+        statusCode: 400,
+        message: "Password tidak cocok",
+      });
+    }
+
+    // hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const doctor = await prisma.doctor.create({
       data: {
         ...doctorInfo,
@@ -43,6 +69,15 @@ export const createDoctor = async (req: Request, res: Response) => {
             value: item.value,
           })),
         },
+        user: {
+          create: {
+            role: "Dokter",
+            isActive: doctorInfo.status === "aktif",
+            username,
+            email,
+            password: hashedPassword,
+          },
+        },
       },
       include: {
         address: {
@@ -51,6 +86,7 @@ export const createDoctor = async (req: Request, res: Response) => {
           },
         },
         telecom: true,
+        user: true,
       },
     });
 
@@ -293,6 +329,7 @@ export const getDoctors = async (req: Request, res: Response) => {
         status: false,
         statusCode: 404,
         message: "Tidak ada dokter yang ditemukan",
+        data: []
       });
     }
 

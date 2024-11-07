@@ -1,4 +1,8 @@
-import { PrismaClient, RegistrationStatus } from "@prisma/client";
+import {
+  EncounterStatus,
+  PrismaClient,
+  RegistrationStatus,
+} from "@prisma/client";
 import { endOfDay, format, parseISO, startOfDay } from "date-fns";
 import { Request, Response } from "express";
 import { patientRegistrationStatusSchema } from "../../validations/patient-validation";
@@ -22,7 +26,7 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
     }
     const patientRegistration = await prisma.patientRegistration.findMany({
       where: {
-        status: "dalam_antrian",
+        status: { in: ["dalam_antrian", "antrian_perawat"] },
         registrationDate: {
           gte: startDate,
           lte: endDate,
@@ -61,6 +65,12 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
+          },
+        },
+        Encounter: {
+          select: {
+            id: true,
+            status: true,
           },
         },
         createdAt: true,
@@ -186,6 +196,12 @@ export const getPatientRegistrationById = async (
             installation: true,
           },
         },
+        PaymentMethod: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         createdAt: true,
         updatedAt: true,
       },
@@ -214,7 +230,6 @@ export const getPatientRegistrationById = async (
   }
 };
 
-
 export const getHistoryEncounter = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -231,8 +246,8 @@ export const getHistoryEncounter = async (req: Request, res: Response) => {
       where: {
         patientRegistration: {
           patient: {
-            id: id
-          }
+            id: id,
+          },
         },
       },
       include: {
@@ -295,57 +310,80 @@ export const getHistoryEncounter = async (req: Request, res: Response) => {
   }
 };
 
-export const getEncounterPatientRegistrationById = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const encounter = await prisma.encounter.findUnique({
-        where: {
-            patientRegistrationId: id
-        },
-        include: {
-          patientRegistration: {
-            include: {
-              patient: {
-                select: {
-                  id: true,
-                  name: true,
-                  medicalRecordNumber: true,
-                },
-              },
-              doctor: {
-                select: {
-                  id: true,
-                  name: true,
-                  specialization: true,
-                },
-              },
-              room: {
-                select: {
-                  id: true,
-                  name: true,
-                  installation: true,
-                },
-              },
+export const getEncounterPatientRegistrationById = async (
+  req: Request,
+  res: Response
+) => {
+  const { id } = req.params;
+  const encounter = await prisma.encounter.findUnique({
+    where: {
+      patientRegistrationId: id,
+    },
+    select: {
+      id: true,
+      patientRegistrationId: true,
+      encounterType: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      diagnosis: true,
+      treatmentPlan: true,
+      notes: true,
+      patientRegistration: {
+        select: {
+          id: true,
+          registrationNumber: true,
+          registrationDate: true,
+          queueNumber: true,
+          status: true,
+          registrationType: true,
+          patient: {
+            select: {
+              id: true,
+              name: true,
+              medicalRecordNumber: true,
             },
           },
-          anamnesis: true,
-          physicalExamination: true,
-          psychologicalExamination: true,
+          doctor: {
+            select: {
+              id: true,
+              name: true,
+              specialization: true,
+            },
+          },
+          room: {
+            select: {
+              id: true,
+              name: true,
+              installation: true,
+            },
+          },
+          createdAt: true,
+          updatedAt: true,
         },
-    })
-    if (!encounter) {
-        return res.status(404).json({
-            status: false,
-            statusCode: 404,
-            message: "Data kunjungan pasien tidak ditemukan",
-        })
-    }
-    res.status(200).json({
-        status: true,
-        statusCode: 200,
-        message: "Berhasil mengambil data kunjungan pasien",
-        data: encounter
-    })
-}
+      },
+      anamnesis: true,
+      physicalExamination: true,
+      psychologicalExamination: true,
+      EncounterTimeline: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  if (!encounter) {
+    return res.status(404).json({
+      status: false,
+      statusCode: 404,
+      message: "Data kunjungan pasien tidak ditemukan",
+    });
+  }
+  res.status(200).json({
+    status: true,
+    statusCode: 200,
+    message: "Berhasil mengambil data kunjungan pasien",
+    data: encounter,
+  });
+};
 
 export const updateEncounterPatientRegistration = async (
   req: Request,
@@ -387,12 +425,18 @@ export const updateEncounterPatientRegistration = async (
                 create: {
                   ...validatedData.anamnesis,
                   recordedDate: new Date(),
-                  lastMenstrualPeriod: validatedData.anamnesis.lastMenstrualPeriod ? new Date(validatedData.anamnesis.lastMenstrualPeriod) : undefined,
+                  lastMenstrualPeriod: validatedData.anamnesis
+                    .lastMenstrualPeriod
+                    ? new Date(validatedData.anamnesis.lastMenstrualPeriod)
+                    : undefined,
                 },
                 update: {
                   ...validatedData.anamnesis,
                   recordedDate: new Date(),
-                  lastMenstrualPeriod: validatedData.anamnesis.lastMenstrualPeriod ? new Date(validatedData.anamnesis.lastMenstrualPeriod) : undefined,
+                  lastMenstrualPeriod: validatedData.anamnesis
+                    .lastMenstrualPeriod
+                    ? new Date(validatedData.anamnesis.lastMenstrualPeriod)
+                    : undefined,
                 },
               },
             }
@@ -472,7 +516,6 @@ export const updatePatientRegistrationStatus = async (
         message: "ID registrasi pasien tidak valid",
       });
     }
-
     const validateData = patientRegistrationStatusSchema.safeParse(req.body);
     if (!validateData.success) {
       return res.status(400).json({
@@ -498,6 +541,36 @@ export const updatePatientRegistrationStatus = async (
         message: "Registrasi pasien tidak ditemukan",
       });
     }
+
+    const encounter = await prisma.encounter.findFirst({
+      where: { patientRegistrationId: id },
+    });
+
+    if (!encounter) {
+      return res.status(404).json({
+        status: false,
+        statusCode: 404,
+        message: "Encounter tidak ditemukan untuk registrasi ini",
+      });
+    }
+
+    await prisma.encounter.update({
+      where: { id: encounter.id },
+      data: { status: validateData.data.statusEncounter as EncounterStatus },
+    });
+
+    await prisma.encounterTimeline.create({
+      data: {
+        encounterId: encounter.id,
+        status: validateData.data.status as RegistrationStatus,
+        timestamp: new Date(),
+        performedBy: validateData.data.performedBy || "Perawat",
+        notes: validateData.data.notes || "",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
     res.status(200).json({
       status: true,
       statusCode: 200,
@@ -518,15 +591,25 @@ export const updatePatientRegistrationStatus = async (
 
 export const getQueueInfo = async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    const startOfToday = startOfDay(today);
-    const endOfToday = endOfDay(today);
+    const { from, to } = req.query;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (from) {
+      startDate = startOfDay(parseISO(from as string));
+      endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(startDate);
+    } else {
+      // Jika tidak ada parameter tanggal, gunakan hari ini
+      startDate = startOfDay(new Date());
+      endDate = endOfDay(new Date());
+    }
 
     const todayRegistrations = await prisma.patientRegistration.findMany({
       where: {
         registrationDate: {
-          gte: startOfToday,
-          lte: endOfToday,
+          gte: startDate,
+          lte: endDate,
         },
         status: "dalam_antrian",
       },
@@ -558,6 +641,12 @@ export const getQueueInfo = async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
+          },
+        },
+        Encounter: {
+          select: {
+            id: true,
+            status: true,
           },
         },
       },
@@ -609,6 +698,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
       doctor: reg.doctor,
       room: reg.room,
       PaymentMethod: reg.PaymentMethod,
+      Encounter: reg.Encounter,
     }));
 
     res.status(200).json({

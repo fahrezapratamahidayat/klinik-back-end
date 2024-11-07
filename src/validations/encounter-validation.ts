@@ -1,4 +1,4 @@
-import { EncounterStatus } from '@prisma/client';
+import { EncounterStatus, PrescriptionStatus } from '@prisma/client';
 import { z } from "zod";
 
 // Skema validasi untuk Anamnesis
@@ -102,6 +102,19 @@ const PsychologicalExaminationSchema = z.object({
   effectiveDateTime: z.string().datetime(),
 });
 
+const PrescriptionSchema = z.object({
+  medicineId: z.string(),
+  quantity: z.number().int(),
+  dosage: z.string(),
+  route: z.string(),
+  frequency: z.string(),
+  duration: z.number().int(),
+  notes: z.string().optional(),
+  status: z.nativeEnum(PrescriptionStatus).optional(),
+  dispensedAt: z.string().datetime().optional(),
+  dispensedBy: z.string().optional(),
+});
+
 // Skema validasi utama untuk pembaruan encounter
 export const UpdateEncounterSchema = z.object({
   status: z.nativeEnum(EncounterStatus).optional(),
@@ -112,4 +125,5 @@ export const UpdateEncounterSchema = z.object({
   anamnesis: AnamnesisSchema.optional(),
   physicalExamination: PhysicalExaminationSchema.optional(),
   psychologicalExamination: PsychologicalExaminationSchema.optional(),
+  prescriptions: PrescriptionSchema.array().optional(),
 });

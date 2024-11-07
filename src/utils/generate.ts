@@ -113,6 +113,52 @@ export async function generateDailyQueueNumber(doctorId: string): Promise<number
   }
 }
 
+export async function generateMedicineCode(): Promise<string> {
+  const lastMedicine = await prisma.medicine.findFirst({
+    orderBy: {
+      code: "desc",
+    },
+  });
+
+  let nextNumber = 1;
+
+  if(lastMedicine && lastMedicine.code) {
+    const lastNumber = parseInt(lastMedicine.code.slice(2));
+    nextNumber = lastNumber + 1;
+  }
+
+  const medicineCode = `OB${nextNumber.toString().padStart(6, '0')}`;
+
+  return medicineCode;
+}
+
+export async function generatePrescriptionNumber(): Promise<string> {
+  try {
+    const lastPrescription = await prisma.prescriptions.findFirst({
+      orderBy: {
+        prescriptionNumber: "desc",
+      },
+      select: {
+        prescriptionNumber: true,
+      },
+    });
+
+    let nextNumber = 1;
+
+    if (lastPrescription && lastPrescription.prescriptionNumber) {
+      const lastNumber = parseInt(lastPrescription.prescriptionNumber.slice(3));
+      nextNumber = lastNumber + 1;
+    }
+
+    const prescriptionNumber = `RX-${nextNumber.toString().padStart(6, "0")}`;
+
+    return prescriptionNumber;
+  } catch (error) {
+    console.error("Kesalahan saat membuat nomor resep:", error);
+    throw new Error("Gagal membuat nomor resep");
+  }
+}
+
 function getInstallationPrefix(installation: Installation): string {
   switch (installation) {
     case 'rawat_jalan':

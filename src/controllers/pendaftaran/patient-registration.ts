@@ -1,11 +1,18 @@
-import { PrismaClient, RegistrationStatus } from "@prisma/client";
+import {
+  EncounterStatus,
+  PrismaClient,
+  RegistrationStatus,
+} from "@prisma/client";
 import { Request, Response } from "express";
-import { createPatientRegistrationValidation, patientRegistrationStatusSchema } from "../../validations/patient-validation";
+import {
+  createPatientRegistrationValidation,
+  patientRegistrationStatusSchema,
+} from "../../validations/patient-validation";
 import {
   generateDailyQueueNumber,
   generateRegistrationId,
 } from "../../utils/generate";
-import { endOfDay, format, parseISO, startOfDay } from "date-fns";
+import { endOfDay, endOfToday, format, parseISO, startOfDay, startOfToday } from "date-fns";
 import { id } from "date-fns/locale";
 
 const prisma = new PrismaClient();
@@ -146,6 +153,16 @@ export const createPatientRegistration = async (
       },
     });
 
+    await prisma.encounterTimeline.create({
+      data: {
+        encounterId: encounter.id,
+        status: "draft",
+        timestamp: new Date(),
+        performedBy: "Pendaftaran",
+        createdAt: new Date(),
+      },
+    });
+
     res.status(201).json({
       status: true,
       statusCode: 201,
@@ -164,15 +181,17 @@ export const createPatientRegistration = async (
 export const getPatientRegistrations = async (req: Request, res: Response) => {
   try {
     const { from, to } = req.query;
+
     let startDate: Date;
     let endDate: Date;
 
     if (from) {
       startDate = startOfDay(parseISO(from as string));
-      endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(new Date());
+      endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(startDate);
     } else {
-      startDate = new Date(0);
-      endDate = new Date();
+      // Jika tidak ada parameter tanggal, gunakan hari ini
+      startDate = startOfDay(new Date());
+      endDate = endOfDay(new Date());
     }
 
     const patientRegistrations = await prisma.patientRegistration.findMany({
@@ -215,6 +234,12 @@ export const getPatientRegistrations = async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
+          },
+        },
+        Encounter: {
+          select: {
+            id: true,
+            status: true,
           },
         },
         createdAt: true,
@@ -448,7 +473,7 @@ export const updatePatientRegistrationStatus = async (
 ) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({
         status: false,
@@ -456,7 +481,7 @@ export const updatePatientRegistrationStatus = async (
         message: "ID registrasi pasien tidak valid",
       });
     }
-  
+
     const validateData = patientRegistrationStatusSchema.safeParse(req.body);
     if (!validateData.success) {
       return res.status(400).json({
@@ -470,30 +495,64 @@ export const updatePatientRegistrationStatus = async (
       });
     }
 
-    const updatedRegistration = await prisma.patientRegistration.update({
-      where: { id },
-      data: { status: validateData.data.status as RegistrationStatus },
-    });
-
-   if (!updatedRegistration) {
-      return res.status(404).json({
-        status: false,
-        statusCode: 404,
-        message: "Registrasi pasien tidak ditemukan",
+    const result = await prisma.$transaction(async (prisma) => {
+      const updatedRegistration = await prisma.patientRegistration.update({
+        where: { id },
+        data: { status: validateData.data.status as RegistrationStatus },
       });
-    }
 
-    // await prisma.encounter.updateMany({
-    //   where: { patientRegistrationId: id },
-    //   data: { status: "in_progress" },
-    // });
+      if (!updatedRegistration) {
+        throw new Error("Registrasi pasien tidak ditemukan");
+      }
+
+      const encounter = await prisma.encounter.findFirst({
+        where: { patientRegistrationId: id },
+      });
+
+      if (!encounter) {
+        throw new Error("Encounter tidak ditemukan untuk registrasi ini");
+      }
+
+      await prisma.encounter.update({
+        where: { id: encounter.id },
+        data: { 
+          status: validateData.data.statusEncounter as EncounterStatus
+         },
+      });
+
+      await prisma.encounterTimeline.create({
+        data: {
+          encounterId: encounter.id,
+          status: validateData.data.status as RegistrationStatus,
+          timestamp: new Date(),
+          performedBy: "Pendaftaran",
+          createdAt: new Date(),
+        },
+      });
+
+      return updatedRegistration;
+    });
 
     res.status(200).json({
       status: true,
       statusCode: 200,
-      message: `Status registrasi pasien berhasil diperbarui menjadi ${validateData.data.status.replace("_", " ").charAt(0).toUpperCase() + validateData.data.status.replace("_", " ").slice(1)}`,
+      message: `Status registrasi pasien berhasil diperbarui menjadi ${
+        validateData.data.status.replace("_", " ").charAt(0).toUpperCase() +
+        validateData.data.status.replace("_", " ").slice(1)
+      }`,
+      data: result,
     });
   } catch (error: any) {
+    if (
+      error.message === "Registrasi pasien tidak ditemukan" ||
+      error.message === "Encounter tidak ditemukan untuk registrasi ini"
+    ) {
+      return res.status(404).json({
+        status: false,
+        statusCode: 404,
+        message: error.message,
+      });
+    }
     res.status(500).json({
       status: false,
       statusCode: 500,
@@ -505,19 +564,28 @@ export const updatePatientRegistrationStatus = async (
 
 export const getQueueInfo = async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    const startOfToday = startOfDay(today);
-    const endOfToday = endOfDay(today);
+    const { from, to } = req.query;
 
+    let startDate: Date;
+    let endDate: Date;
+
+    if (from) {
+      startDate = startOfDay(parseISO(from as string));
+      endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(startDate);
+    } else {
+      // Jika tidak ada parameter tanggal, gunakan hari ini
+      startDate = startOfDay(new Date());
+      endDate = endOfDay(new Date());
+    }
     const todayRegistrations = await prisma.patientRegistration.findMany({
       where: {
         registrationDate: {
-          gte: startOfToday,
-          lte: endOfToday,
+          gte: startDate,
+          lte: endDate,
         },
         status: {
-          in: ['draft']
-        }
+          in: ["draft"],
+        },
       },
       include: {
         patient: {
@@ -547,6 +615,12 @@ export const getQueueInfo = async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
+          },
+        },
+        Encounter: {
+          select: {
+            id: true,
+            status: true,
           },
         },
       },
@@ -598,6 +672,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
       doctor: reg.doctor,
       room: reg.room,
       PaymentMethod: reg.PaymentMethod,
+      Encounter: reg.Encounter,
     }));
 
     res.status(200).json({

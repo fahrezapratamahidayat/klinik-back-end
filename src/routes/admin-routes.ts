@@ -2,8 +2,15 @@ import { RequestHandler, Router } from "express";
 import { createDoctor, deleteDoctor, getDoctorById, getDoctors, updateDoctor } from "../controllers/admin/doctor-controller";
 import { createRoom, deleteRoom, getRoomById, getRooms, updateRoom } from "../controllers/admin/room-controller";
 import { createDoctorSchedule,getDoctorSchedules,getDoctorScheduleById, deleteDoctorSchedule, updateDoctorSchedule } from "../controllers/admin/doctor-schedule-controller";
+import { deletePatient, getAllPatients, getPatientById } from "../controllers/admin/patient-controller";
 
 export const AdminRoutes: Router = Router();
+
+
+// Patient Routes
+AdminRoutes.get("/patient", getAllPatients as RequestHandler);
+AdminRoutes.get("/patient/:id", getPatientById as RequestHandler);
+AdminRoutes.delete("/patient/:id", deletePatient as RequestHandler);
 
 // Doctor Routes
 AdminRoutes.post("/doctor", createDoctor as RequestHandler);

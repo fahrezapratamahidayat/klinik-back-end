@@ -2,6 +2,8 @@ import { Day, PrismaClient } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import { validateInput } from "../../helpers/validation";
 import { createDoctorScheduleValidation } from "../../validations/doctor-validation";
+import { endOfDay, startOfDay } from "date-fns";
+import { parseISO } from "date-fns";
 const prisma = new PrismaClient();
 
 export const createDoctorSchedule = async (
@@ -26,7 +28,6 @@ export const createDoctorSchedule = async (
   const { doctorId, roomId, schedules } = validationResult.data;
 
   try {
-    // Validasi dokter
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
     });
@@ -145,7 +146,26 @@ export const getDoctorSchedules = async (
   next: NextFunction
 ) => {
   try {
+    const { from, to } = req.query;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (from) {
+      startDate = startOfDay(parseISO(from as string));
+      endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(startDate);
+    } else {
+      // Jika tidak ada parameter tanggal, gunakan hari ini
+      startDate = startOfDay(new Date());
+      endDate = endOfDay(new Date());
+    }
     const doctorSchedules = await prisma.doctorSchedule.findMany({
+      where: {
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
       select: {
         id: true,
         date: true,
@@ -175,6 +195,14 @@ export const getDoctorSchedules = async (
         },
       },
     });
+    if (doctorSchedules.length === 0) {
+      return res.status(404).json({
+        status: false,
+        statusCode: 404,
+        message: `Jadwal dokter tidak ditemukan untuk tanggal ${startDate.toISOString().split("T")[0]} sampai ${endDate.toISOString().split("T")[0]}`,
+        data: [],
+      });
+    }
     return res.status(200).json({
       status: true,
       statusCode: 200,

@@ -10,6 +10,7 @@ import {
   RelationshipType,
   RegistrationStatus,
   EncounterType,
+  EncounterStatus,
 } from "@prisma/client";
 
 export const createPatientValidation = z.object({
@@ -130,5 +131,8 @@ export const patientRegistrationStatusSchema = z.object({
       message: "ID registrasi pasien harus berupa UUID",
     }),
   status: z.nativeEnum(RegistrationStatus, { required_error: "Status harus diisi" }),
+  statusEncounter: z.nativeEnum(EncounterStatus, { required_error: "Status kunjungan harus diisi" }).optional(),
+  notes: z.string().optional(),
+  performedBy: z.string({ required_error: "Dokter harus diisi" }).optional(),
 });
 

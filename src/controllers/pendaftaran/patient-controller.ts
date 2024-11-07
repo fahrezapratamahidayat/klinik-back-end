@@ -2,7 +2,6 @@ import {
   PrismaClient,
   IdentifierType,
   Gender,
-  MaritalStatus,
   CitizenshipStatus,
 } from "@prisma/client";
 import { Request, Response } from "express";
@@ -314,7 +313,7 @@ export const getAllPatients = async (req: Request, res: Response) => {
       },
       orderBy: [{ createdAt: "desc" }],
     });
-    if(patients.length === 0) {
+    if (patients.length === 0) {
       return res.status(404).json({
         status: false,
         statusCode: 404,
@@ -331,13 +330,11 @@ export const getAllPatients = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Kesalahan saat mengambil daftar pasien:", error);
-    res
-      .status(500)
-      .json({
-        status: false,
-        statusCode: 500,
-        message: "Terjadi kesalahan saat mengambil daftar pasien",
-      });
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Terjadi kesalahan saat mengambil daftar pasien",
+    });
   }
 };
 
