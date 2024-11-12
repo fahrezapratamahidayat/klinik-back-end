@@ -277,6 +277,13 @@ enum MedicineTransactionType {
   DAMAGED /// Obat rusak
 }
 
+enum DiagnosisType {
+  primary /// Diagnosa utama
+  secondary /// Diagnosa sekunder
+  working /// Diagnosa kerja
+  differential /// Diagnosa banding
+}
+
 model User {
   id           String    @id @default(uuid())
   username     String    @unique
@@ -299,7 +306,6 @@ model Encounter {
   status                   EncounterStatus
   startDate                DateTime
   endDate                  DateTime?
-  diagnosis                String?
   treatmentPlan            String?
   notes                    String?
   anamnesis                Anamnesis?
@@ -307,8 +313,10 @@ model Encounter {
   psychologicalExamination PsychologicalExamination?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
-  EncounterTimeline        EncounterTimeline[]
-  Prescriptions            Prescriptions[]
+  encounterTimeline        EncounterTimeline[]
+  prescriptions            Prescriptions[]
+  diagnosis                Diagnosis[]
+  procedure                Procedure[]
 }
 
 model EncounterTimeline {
@@ -483,6 +491,82 @@ model PsychologicalExamination {
   updatedAt         DateTime @updatedAt
 }
 
+model Prescriptions {
+  id                 String             @id @default(uuid())
+  prescriptionNumber String             @unique /// Nomor resep
+  encounterId        String /// ID kunjungan
+  encounter          Encounter          @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  medicine           Medicine           @relation(fields: [medicineId], references: [id])
+  medicineId         String
+  quantity           Int /// Jumlah obat
+  dosage             String /// Dosis (misal: 3x1)
+  route              String /// Rute pemberian (oral, topical, dll)
+  frequency          String /// Frekuensi pemberian
+  duration           Int /// Durasi penggunaan (dalam hari)
+  notes              String? /// Catatan tambahan
+  notesPharmacy      String? /// Catatan apoteker
+  status             PrescriptionStatus @default(draft)
+  dispensedAt        DateTime? /// Waktu obat diserahkan
+  dispensedBy        String? /// Petugas yang menyerahkan
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([encounterId])
+}
+
+model Icd10 {
+  id          Int         @id @default(autoincrement())
+  code        String      @unique /// Kode ICD-10
+  name        String /// Nama penyakit/kondisi
+  description String? /// Deskripsi detail
+  category    String? /// Kategori penyakit
+  diagnoses   Diagnosis[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt @default(now())
+}
+
+model Icd9 {
+  id          Int         @id @default(autoincrement())
+  code        String      @unique /// Kode ICD-9-CM
+  name        String /// Nama prosedur
+  description String? /// Deskripsi detail
+  category    String? /// Kategori prosedur
+  procedures  Procedure[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt @default(now())
+}
+
+model Diagnosis {
+  id          Int           @id @default(autoincrement())
+  encounterId String
+  encounter   Encounter     @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  icd10Id     Int
+  icd10       Icd10         @relation(fields: [icd10Id], references: [id])
+  type        DiagnosisType
+  notes       String? /// Catatan tambahan untuk diagnosa
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt @default(now())
+
+  @@index([encounterId])
+  @@index([icd10Id])
+}
+
+model Procedure {
+  id          String    @id @default(uuid())
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  icd9Id      Int
+  icd9        Icd9      @relation(fields: [icd9Id], references: [id])
+  notes       String? /// Catatan prosedur
+  performedAt DateTime /// Waktu prosedur dilakukan
+  performedBy String /// Petugas yang melakukan prosedur
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt @default(now())
+
+  @@index([encounterId])
+  @@index([icd9Id])
+}
+
 model Medicine {
   id                  String                @id @default(uuid())
   code                String                @unique /// Kode obat
@@ -509,28 +593,6 @@ model Medicine {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   MedicineTransaction MedicineTransaction[]
-}
-
-model Prescriptions {
-  id                 String             @id @default(uuid())
-  prescriptionNumber String             @unique /// Nomor resep
-  encounterId        String /// ID kunjungan
-  encounter          Encounter          @relation(fields: [encounterId], references: [id], onDelete: Cascade)
-  medicine           Medicine           @relation(fields: [medicineId], references: [id])
-  medicineId         String
-  quantity           Int /// Jumlah obat
-  dosage             String /// Dosis (misal: 3x1)
-  route              String /// Rute pemberian (oral, topical, dll)
-  frequency          String /// Frekuensi pemberian
-  duration           Int /// Durasi penggunaan (dalam hari)
-  notes              String? /// Catatan tambahan
-  status             PrescriptionStatus @default(draft)
-  dispensedAt        DateTime? /// Waktu obat diserahkan
-  dispensedBy        String? /// Petugas yang menyerahkan
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-
-  @@index([encounterId])
 }
 
 model MedicineTransaction {
