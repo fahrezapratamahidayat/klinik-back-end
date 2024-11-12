@@ -1,6 +1,7 @@
 import { Router, RequestHandler } from "express";
-import { getEncounterPatientRegistrationById, getHistoryEncounter, getPatientRegistration, getPatientRegistrationById, updateEncounterPatientRegistration, getQueueInfo, updatePatientRegistrationStatus } from "../controllers/perawat/patient-registration";
+import { getPatientRegistration, getPatientRegistrationById, getQueueInfo, updatePatientRegistrationStatus } from "../controllers/perawat/patient-registration";
 import { getAllPatients, getPatientById } from "../controllers/perawat/patient-controller";
+import { getEncounterPatientRegistrationById, getHistoryEncounter, updateEncounterPatientRegistration } from "../controllers/perawat/encounter-controller";
 
 export const PerawatRoutes: Router = Router();
 

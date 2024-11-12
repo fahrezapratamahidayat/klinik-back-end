@@ -7,6 +7,7 @@ import { PerawatRoutes } from "./perawat-routes";
 import { AuthRoutes } from "./auth-routes";
 import { FarmasiRoutes } from "./farmasi-routes";
 import { doctorRoutes } from "./doctor-routes";
+import { KasirRoutes } from "./kasir-routes";
 
 const _routes: Array<[string, Router]> = [
     ['/', MainRouter],
@@ -16,7 +17,8 @@ const _routes: Array<[string, Router]> = [
     ['/api/locations', LocationRoutes],
     ['/api/auth', AuthRoutes],
     ['/api/farmasi', FarmasiRoutes],
-    ['/api/dokter', doctorRoutes]
+    ['/api/dokter', doctorRoutes],
+    ['/api/kasir', KasirRoutes]
 ]
 
 export const routes = (app: Application) => {

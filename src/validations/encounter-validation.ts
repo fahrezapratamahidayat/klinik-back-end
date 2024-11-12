@@ -1,4 +1,4 @@
-import { EncounterStatus, PrescriptionStatus } from '@prisma/client';
+import { DiagnosisType, EncounterStatus, PrescriptionStatus } from '@prisma/client';
 import { z } from "zod";
 
 // Skema validasi untuk Anamnesis
@@ -115,15 +115,29 @@ const PrescriptionSchema = z.object({
   dispensedBy: z.string().optional(),
 });
 
+const DiagnosisSchema = z.object({
+  icd10Id: z.number(),
+  type: z.nativeEnum(DiagnosisType),
+  notes: z.string().optional(),
+});
+
+const ProcedureSchema = z.object({
+  icd9Id: z.number(),
+  notes: z.string().optional(),
+  performedAt: z.string().datetime(),
+  performedBy: z.string(),
+});
+
 // Skema validasi utama untuk pembaruan encounter
 export const UpdateEncounterSchema = z.object({
   status: z.nativeEnum(EncounterStatus).optional(),
   endDate: z.string().datetime().optional(),
-  diagnosis: z.string().optional(),
   treatmentPlan: z.string().optional(),
   notes: z.string().optional(),
   anamnesis: AnamnesisSchema.optional(),
   physicalExamination: PhysicalExaminationSchema.optional(),
   psychologicalExamination: PsychologicalExaminationSchema.optional(),
   prescriptions: PrescriptionSchema.array().optional(),
+  diagnosis: DiagnosisSchema.array().optional(),
+  procedure: ProcedureSchema.array().optional(),
 });

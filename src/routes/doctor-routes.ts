@@ -3,7 +3,7 @@ import { getPatientRegistration,getPatientRegistrationById, getQueueInfo, update
 import { getAllPatients } from "../controllers/dokter/patient-controller";
 import { getPatientById } from "../controllers/dokter/patient-controller";
 import { getAllMedicine } from "../controllers/dokter/medicine-controller";
-import { getHistoryEncounter, updateEncounterPatientRegistration, getEncounterPatientRegistrationById } from "../controllers/dokter/encounter-controller";
+import { getHistoryEncounter, updateEncounterPatientRegistration, getEncounterPatientRegistrationById, getIcd10, getIcd9 } from "../controllers/dokter/encounter-controller";
 
 export const doctorRoutes: Router = Router();
 
@@ -26,3 +26,10 @@ doctorRoutes.put("/encounter/:id", updateEncounterPatientRegistration as Request
 
 // Medicine
 doctorRoutes.get("/medicine", getAllMedicine as RequestHandler);
+
+// icd 10
+doctorRoutes.get("/icd10", getIcd10 as RequestHandler);
+
+// icd 9
+doctorRoutes.get("/icd9", getIcd9 as RequestHandler);
+
