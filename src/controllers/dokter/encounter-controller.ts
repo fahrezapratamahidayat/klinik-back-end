@@ -54,7 +54,7 @@ export const getHistoryEncounter = async (req: Request, res: Response) => {
         anamnesis: true,
         physicalExamination: true,
         psychologicalExamination: true,
-        Prescriptions: true,
+        prescriptions: true,
       },
       orderBy: {
         startDate: "asc",
@@ -102,7 +102,6 @@ export const getEncounterPatientRegistrationById = async (
       status: true,
       startDate: true,
       endDate: true,
-      diagnosis: true,
       treatmentPlan: true,
       notes: true,
       patientRegistration: {
@@ -141,8 +140,18 @@ export const getEncounterPatientRegistrationById = async (
       anamnesis: true,
       physicalExamination: true,
       psychologicalExamination: true,
-      Prescriptions: true,
-      EncounterTimeline: true,
+      prescriptions: true,
+      diagnosis: {
+        include: {
+          icd10: true,
+        },
+      },
+      procedure: {
+        include: {
+          icd9: true,
+        },
+      },
+      encounterTimeline: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -193,7 +202,6 @@ export const updateEncounterPatientRegistration = async (
         endDate: validatedData.endDate
           ? new Date(validatedData.endDate)
           : undefined,
-        diagnosis: validatedData.diagnosis,
         treatmentPlan: validatedData.treatmentPlan,
         notes: validatedData.notes,
         anamnesis: validatedData.anamnesis
@@ -246,7 +254,7 @@ export const updateEncounterPatientRegistration = async (
               },
             }
           : undefined,
-        Prescriptions: {
+        prescriptions: {
           deleteMany: {},
           ...(validatedData.prescriptions &&
           validatedData.prescriptions.length > 0
@@ -271,12 +279,43 @@ export const updateEncounterPatientRegistration = async (
               }
             : {}),
         },
+        diagnosis: {
+          deleteMany: {},
+          ...(validatedData.diagnosis && validatedData.diagnosis.length > 0
+            ? {
+                create: await Promise.all(
+                  validatedData.diagnosis.map(async (diagnosis) => ({
+                    icd10Id: diagnosis.icd10Id,
+                    type: diagnosis.type,
+                    notes: diagnosis.notes,
+                  }))
+                ),
+              }
+            : {}),
+        },
+        procedure: {
+          deleteMany: {},
+          ...(validatedData.procedure && validatedData.procedure.length > 0
+            ? {
+                create: await Promise.all(
+                  validatedData.procedure.map(async (procedure) => ({
+                    icd9Id: procedure.icd9Id,
+                    notes: procedure.notes,
+                    performedAt: new Date(procedure.performedAt),
+                    performedBy: procedure.performedBy,
+                  }))
+                ),
+              }
+            : {}),
+        },
       },
       include: {
         anamnesis: true,
         physicalExamination: true,
         psychologicalExamination: true,
-        Prescriptions: true,
+        prescriptions: true,
+        diagnosis: true,
+        procedure: true,
       },
     });
 
@@ -300,6 +339,148 @@ export const updateEncounterPatientRegistration = async (
       status: false,
       statusCode: 500,
       message: "Terjadi kesalahan saat memperbarui encounter",
+      error: error.message,
+    });
+  }
+};
+
+// icd 10
+export const getIcd10 = async (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10, search = "", category = "" } = req.query;
+
+    // Convert ke number
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Buat kondisi pencarian
+    const whereCondition = {
+      OR: [
+        { code: { contains: String(search) } },
+        { description: { contains: String(search) } },
+      ],
+      ...(category && { category: String(category) }),
+    };
+
+    // Ambil total data untuk pagination
+    const totalData = await prisma.icd10.count({
+      where: whereCondition,
+    });
+
+    // Ambil data dengan filter dan pagination
+    const icd10 = await prisma.icd10.findMany({
+      where: whereCondition,
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        description: true,
+        category: true,
+      },
+      skip: skip,
+      take: limitNumber,
+      orderBy: {
+        code: "asc",
+      },
+    });
+
+    if (icd10.length === 0) {
+      return res.status(200).json({
+        status: false,
+        statusCode: 200,
+        message: "Data ICD-10 tidak ditemukan",
+        data: [],
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      statusCode: 200,
+      message: "Berhasil mengambil data ICD-10",
+      data: icd10,
+      meta: {
+        page: pageNumber,
+        limit: limitNumber,
+        total: totalData,
+        totalPages: Math.ceil(totalData / limitNumber),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Terjadi kesalahan saat mengambil data ICD-10",
+      error: error.message,
+    });
+  }
+};
+
+export const getIcd9 = async (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10, search = "", category = "" } = req.query;
+    // Convert ke number
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Buat kondisi pencarian
+    const whereCondition = {
+      OR: [
+        { code: { contains: String(search) } },
+        { description: { contains: String(search) } },
+      ],
+      ...(category && { category: String(category) }),
+    };
+
+    // Ambil total data untuk pagination
+    const totalData = await prisma.icd10.count({
+      where: whereCondition,
+    });
+
+    // Ambil data dengan filter dan pagination
+    const icd9 = await prisma.icd9.findMany({
+      where: whereCondition,
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        description: true,
+        category: true,
+      },
+      skip: skip,
+      take: limitNumber,
+      orderBy: {
+        code: "asc",
+      },
+    });
+
+    if (icd9.length === 0) {
+      return res.status(200).json({
+        status: false,
+        statusCode: 200,
+        message: "Data ICD-10 tidak ditemukan",
+        data: [],
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      statusCode: 200,
+      message: "Berhasil mengambil data ICD-10",
+      data: icd9,
+      meta: {
+        page: pageNumber,
+        limit: limitNumber,
+        total: totalData,
+        totalPages: Math.ceil(totalData / limitNumber),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: false,
+      statusCode: 500,
+      message: "Terjadi kesalahan saat mengambil data ICD-10",
       error: error.message,
     });
   }
