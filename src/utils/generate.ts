@@ -159,6 +159,41 @@ export async function generatePrescriptionNumber(): Promise<string> {
   }
 }
 
+export const generatePaymentNumber = async () => {
+  const today = new Date();
+  const year = today.getFullYear().toString();
+  const month = (today.getMonth() + 1).toString().padStart(2, '0');
+  const day = today.getDate().toString().padStart(2, '0');
+  
+  // Format: PMT/YYYYMMDD/XXXX
+  const prefix = 'PMT';
+  const dateString = `${year}${month}${day}`;
+  
+  // Cari nomor payment terakhir untuk hari ini
+  const lastPayment = await prisma.payment.findFirst({
+    where: {
+      paymentNumber: {
+        startsWith: `${prefix}/${dateString}/`
+      }
+    },
+    orderBy: {
+      paymentNumber: 'desc'
+    }
+  });
+  
+  let sequence = 1;
+  if (lastPayment) {
+    // Ambil nomor urut terakhir dan tambah 1
+    const lastSequence = parseInt(lastPayment.paymentNumber.split('/').pop() || '0');
+    sequence = lastSequence + 1;
+  }
+  
+  // Format nomor urut dengan padding 4 digit
+  const sequenceString = sequence.toString().padStart(4, '0');
+  
+  return `${prefix}/${dateString}/${sequenceString}`;
+};
+
 function getInstallationPrefix(installation: Installation): string {
   switch (installation) {
     case 'rawat_jalan':
