@@ -1,5 +1,14 @@
 import { RequestHandler, Router } from "express";
 import { getPatientRegistration, updatePatientRegistrationStatus, getQueueInfo, getPatientRegistrationById } from "../controllers/kasir/patient-registration-contoller";
+import { getEncounterPatientRegistrationById, getHistoryEncounter, updateEncounterPatientRegistration } from "../controllers/kasir/encounter-controller";
+import { 
+    getPaymentByRegistrationId, 
+    createPayment, 
+    confirmPayment,
+    getDailyIncome,
+    getMonthlyIncome,
+    getYearlyIncome 
+  } from "../controllers/kasir/payment-controller";
 export const KasirRoutes = Router();
 
 
@@ -8,5 +17,21 @@ KasirRoutes.get("/patient-registration", getPatientRegistration as RequestHandle
 KasirRoutes.get("/patient-registration/:id", getPatientRegistrationById as RequestHandler);
 KasirRoutes.patch("/patient-registration/status/:id", updatePatientRegistrationStatus as RequestHandler);
 
+// Encounter
+KasirRoutes.get("/encounter/history/:id", getHistoryEncounter as RequestHandler);
+KasirRoutes.get("/encounter/:id", getEncounterPatientRegistrationById as RequestHandler);
+KasirRoutes.patch("/encounter/:id", updateEncounterPatientRegistration as RequestHandler);
+
+// Payment
+KasirRoutes.get("/payment/registration/:registrationId", getPaymentByRegistrationId as RequestHandler);
+KasirRoutes.post("/payment", createPayment as RequestHandler);
+KasirRoutes.patch("/payment/:id/confirm", confirmPayment as RequestHandler);
+
+// Income Reports
+KasirRoutes.get("/income/daily", getDailyIncome as RequestHandler);
+KasirRoutes.get("/income/monthly", getMonthlyIncome as RequestHandler);
+KasirRoutes.get("/income/yearly", getYearlyIncome as RequestHandler);
+
 // Queue Info
-KasirRoutes.get("/queue-info", getQueueInfo as RequestHandler); 
+KasirRoutes.get("/queue-info", getQueueInfo as RequestHandler);
+
