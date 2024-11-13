@@ -317,6 +317,7 @@ model Encounter {
   prescriptions            Prescriptions[]
   diagnosis                Diagnosis[]
   procedure                Procedure[]
+  Payment                  Payment?
 }
 
 model EncounterTimeline {
@@ -522,7 +523,7 @@ model Icd10 {
   category    String? /// Kategori penyakit
   diagnoses   Diagnosis[]
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
 }
 
 model Icd9 {
@@ -533,7 +534,7 @@ model Icd9 {
   category    String? /// Kategori prosedur
   procedures  Procedure[]
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
 }
 
 model Diagnosis {
@@ -545,7 +546,7 @@ model Diagnosis {
   type        DiagnosisType
   notes       String? /// Catatan tambahan untuk diagnosa
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
 
   @@index([encounterId])
   @@index([icd10Id])
@@ -561,7 +562,7 @@ model Procedure {
   performedAt DateTime /// Waktu prosedur dilakukan
   performedBy String /// Petugas yang melakukan prosedur
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
   @@index([encounterId])
   @@index([icd9Id])
@@ -610,6 +611,56 @@ model MedicineTransaction {
   updatedAt       DateTime                @updatedAt
 
   @@index([medicineId])
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  cancelled
+  refunded
+}
+
+enum PaymentType {
+  medicine
+  consultation
+  procedure
+  other
+}
+
+model Payment {
+  id              String          @id @default(uuid())
+  paymentNumber   String          @unique
+  encounterId     String          @unique
+  encounter       Encounter       @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  paymentMethodId String
+  paymentMethod   PaymentMethod   @relation(fields: [paymentMethodId], references: [id])
+  totalAmount     Float
+  paymentStatus   PaymentStatus   @default(pending)
+  paidAt          DateTime?
+  paidBy          String?
+  notes           String?
+  PaymentDetail   PaymentDetail[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([encounterId])
+  @@index([paymentMethodId])
+}
+
+model PaymentDetail {
+  id        String      @id @default(uuid())
+  paymentId String
+  payment   Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  itemId    String // ID dari item yang dibayar (bisa prescription.id, procedure.id, dll)
+  itemType  PaymentType // Jenis item yang dibayar
+  quantity  Int
+  price     Float
+  subtotal  Float
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([paymentId])
 }
 
 model Doctor {
@@ -883,6 +934,7 @@ model PaymentMethod {
   patientRegistrations PatientRegistration[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  Payment              Payment[]
 }
 
 model Province {
