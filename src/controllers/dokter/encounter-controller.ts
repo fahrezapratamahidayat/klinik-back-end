@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { UpdateEncounterSchema } from "../../validations/encounter-validation";
 import { generatePrescriptionNumber } from "../../utils/generate";
 
@@ -173,7 +173,8 @@ export const getEncounterPatientRegistrationById = async (
 
 export const updateEncounterPatientRegistration = async (
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const { id } = req.params;
@@ -334,13 +335,7 @@ export const updateEncounterPatientRegistration = async (
       data: updatedEncounter,
     });
   } catch (error: any) {
-    console.error("Kesalahan saat memperbarui encounter:", error);
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Terjadi kesalahan saat memperbarui encounter",
-      error: error.message,
-    });
+    next(error);
   }
 };
 

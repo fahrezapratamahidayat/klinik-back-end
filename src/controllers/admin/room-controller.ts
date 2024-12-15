@@ -1,22 +1,13 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import { Request, Response } from "express";
-import { validateInput } from "../../helpers/validation";
+import { PrismaClient } from "@prisma/client";
+import { Request, Response, NextFunction } from "express";
 import {
   createRoomValidation,
   updateRoomValidation,
 } from "../../validations/room-validation";
 import { generateRoomCode } from "../../utils/generate";
-import { ZodError } from "zod";
 const prisma = new PrismaClient();
 
-function getCustomErrorMessage(err: ZodError["errors"][number]): string {
-  if (err.message === "Required") {
-    return `${err.path.join(".")} harus diisi`;
-  }
-  return err.message;
-}
-
-export const createRoom = async (req: Request, res: Response) => {
+export const createRoom = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = createRoomValidation.parse(req.body);
     const {
@@ -25,7 +16,7 @@ export const createRoom = async (req: Request, res: Response) => {
       description,
       mode,
       type,
-      serviceClass,
+      serviceClassId,
       installation,
       operationalStatus,
       longitude,
@@ -47,7 +38,7 @@ export const createRoom = async (req: Request, res: Response) => {
       description,
       mode,
       type,
-      serviceClass,
+      serviceClassId,
       installation,
       operationalStatus,
       longitude,
@@ -107,45 +98,11 @@ export const createRoom = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    if (error instanceof ZodError) {
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Validasi gagal",
-        errors: error.errors.map((err) => ({
-          field: err.path.join("."),
-          message: getCustomErrorMessage(err),
-        })),
-      });
-    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      let errorMessage = "Terjadi kesalahan saat membuat ruangan";
-      if (error.code === "P2002") {
-        const target = (error.meta as { target: string[] })?.target?.[0] || "";
-        const fieldName = target.split("_")[1] || "field"; // Mengambil nama field dari target
-        errorMessage = `Ruangan dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
-      } else if (error.code === "P2003") {
-        errorMessage =
-          "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
-      }
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: errorMessage,
-        errorDetail: error,
-      });
-    } else {
-      res.status(500).json({
-        status: false,
-        statusCode: 500,
-        message: "Terjadi kesalahan internal server",
-        error:
-          error instanceof Error ? error.message : "Kesalahan tidak diketahui",
-      });
-    }
+    next(error);
   }
 };
 
-export const getRooms = async (req: Request, res: Response) => {
+export const getRooms = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rooms = await prisma.room.findMany();
     if (rooms.length === 0) {
@@ -172,7 +129,7 @@ export const getRooms = async (req: Request, res: Response) => {
   }
 };
 
-export const getRoomById = async (req: Request, res: Response) => {
+export const getRoomById = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   try {
     const room = await prisma.room.findUnique({
@@ -197,16 +154,11 @@ export const getRoomById = async (req: Request, res: Response) => {
       data: room,
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    next(error);
   }
 };
 
-export const updateRoom = async (req: Request, res: Response) => {
+export const updateRoom = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   try {
     const validatedData = updateRoomValidation.parse(req.body);
@@ -276,47 +228,11 @@ export const updateRoom = async (req: Request, res: Response) => {
       data: updatedRoom,
     });
   } catch (error) {
-    if (error instanceof ZodError) {
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Validasi gagal",
-        errors: error.errors.map((err) => ({
-          field: err.path.join("."),
-          message: getCustomErrorMessage(err),
-        })),
-      });
-    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      let errorMessage = "Terjadi kesalahan saat memperbarui ruangan";
-      if (error.code === "P2002") {
-        const target = (error.meta as { target: string[] })?.target?.[0] || "";
-        const fieldName = target.split("_")[1] || "field";
-        errorMessage = `Ruangan dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
-      } else if (error.code === "P2003") {
-        errorMessage =
-          "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
-      } else if (error.code === "P2025") {
-        errorMessage = "Ruangan tidak ditemukan";
-      }
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: errorMessage,
-        errorDetail: error,
-      });
-    } else {
-      res.status(500).json({
-        status: false,
-        statusCode: 500,
-        message: "Terjadi kesalahan internal server",
-        error:
-          error instanceof Error ? error.message : "Kesalahan tidak diketahui",
-      });
-    }
+    next(error);
   }
 };
 
-export const deleteRoom = async (req: Request, res: Response) => {
+export const deleteRoom = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   try {
     const room = await prisma.room.findUnique({
@@ -338,11 +254,6 @@ export const deleteRoom = async (req: Request, res: Response) => {
       message: "Room deleted successfully",
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    next(error);
   }
 };

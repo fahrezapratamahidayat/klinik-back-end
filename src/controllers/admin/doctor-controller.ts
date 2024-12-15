@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import {
   Prisma,
   PrismaClient,
@@ -14,20 +14,13 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-function getCustomErrorMessage(err: ZodError["errors"][number]): string {
-  if (err.message === "Required") {
-    return `${err.path.join(".")} harus diisi`;
-  }
-  return err.message;
-}
-
-export const createDoctor = async (req: Request, res: Response) => {
+export const createDoctor = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = createDoctorValidation.parse(req.body);
     const { address, telecom, username, email, password, confirmPassword, ...doctorInfo } = validatedData;
 
     // validasi email sudah terdaftar
-    const checkEmail = await prisma.user.findUnique({
+    const checkEmail = await prisma.account.findUnique({
       where: { email },
     });
     if (checkEmail) {
@@ -69,9 +62,10 @@ export const createDoctor = async (req: Request, res: Response) => {
             value: item.value,
           })),
         },
-        user: {
+        account: {
           create: {
-            role: "Dokter",
+            type: 'DOCTOR',
+            role: 'Dokter',
             isActive: doctorInfo.status === "aktif",
             username,
             email,
@@ -86,7 +80,7 @@ export const createDoctor = async (req: Request, res: Response) => {
           },
         },
         telecom: true,
-        user: true,
+        account: true,
       },
     });
 
@@ -100,45 +94,11 @@ export const createDoctor = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    if (error instanceof ZodError) {
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Validasi gagal",
-        errors: error.errors.map((err) => ({
-          field: err.path.join("."),
-          message: getCustomErrorMessage(err),
-        })),
-      });
-    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      let errorMessage = "Terjadi kesalahan saat membuat dokter";
-      if (error.code === "P2002") {
-        const target = (error.meta as { target: string[] })?.target?.[0] || "";
-        const fieldName = target.split("_")[1] || "field";
-        errorMessage = `Dokter dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
-      } else if (error.code === "P2003") {
-        errorMessage =
-          "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
-      }
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: errorMessage,
-        errorDetail: error,
-      });
-    } else {
-      res.status(500).json({
-        status: false,
-        statusCode: 500,
-        message: "Terjadi kesalahan internal server",
-        error:
-          error instanceof Error ? error.message : "Kesalahan tidak diketahui",
-      });
-    }
+    next(error);
   }
 };
 
-export const updateDoctor = async (req: Request, res: Response) => {
+export const updateDoctor = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const validatedData = updateDoctorValidation.parse(req.body);
@@ -188,45 +148,11 @@ export const updateDoctor = async (req: Request, res: Response) => {
       data: doctor,
     });
   } catch (error) {
-    if (error instanceof ZodError) {
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: "Validasi gagal",
-        errors: error.errors.map((err) => ({
-          field: err.path.join("."),
-          message: getCustomErrorMessage(err),
-        })),
-      });
-    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      let errorMessage = "Terjadi kesalahan saat mengupdate";
-      if (error.code === "P2002") {
-        const target = (error.meta as { target: string[] })?.target?.[0] || "";
-        const fieldName = target.split("_")[1] || "field";
-        errorMessage = `Dokter dengan ${fieldName} yang sama sudah terdaftar. Mohon gunakan ${fieldName} yang berbeda.`;
-      } else if (error.code === "P2003") {
-        errorMessage =
-          "Data yang direferensikan tidak ditemukan. Pastikan semua kode referensi (seperti kode provinsi, kabupaten, dll.) valid.";
-      }
-      res.status(400).json({
-        status: false,
-        statusCode: 400,
-        message: errorMessage,
-        errorDetail: error,
-      });
-    } else {
-      res.status(500).json({
-        status: false,
-        statusCode: 500,
-        message: "Terjadi kesalahan internal server",
-        error:
-          error instanceof Error ? error.message : "Kesalahan tidak diketahui",
-      });
-    }
+    next(error);
   }
 };
 
-export const deleteDoctor = async (req: Request, res: Response) => {
+export const deleteDoctor = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   try {
     const doctor = await prisma.doctor.delete({
@@ -245,16 +171,11 @@ export const deleteDoctor = async (req: Request, res: Response) => {
       data: doctor,
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    next(error);
   }
 };
 
-export const getDoctors = async (req: Request, res: Response) => {
+export const getDoctors = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = req.query.page
       ? parseInt(req.query.page as string)
@@ -269,10 +190,9 @@ export const getDoctors = async (req: Request, res: Response) => {
 
     const selectFields = {
       id: true,
-      bpjsCode: true,
-      satuSehatId: true,
       name: true,
       specialization: true,
+      consultationFee: true,
       status: true,
       birthDate: true,
       birthPlace: true,
@@ -341,17 +261,11 @@ export const getDoctors = async (req: Request, res: Response) => {
       meta: Object.keys(meta).length > 0 ? meta : undefined,
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Terjadi kesalahan internal server",
-      error:
-        error instanceof Error ? error.message : "Kesalahan tidak diketahui",
-    });
+    next(error);
   }
 };
 
-export const getDoctorById = async (req: Request, res: Response) => {
+export const getDoctorById = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   if (!id) {
     return res.status(400).json({
@@ -435,12 +349,6 @@ export const getDoctorById = async (req: Request, res: Response) => {
       data: doctor,
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Terjadi kesalahan internal server",
-      error:
-        error instanceof Error ? error.message : "Kesalahan tidak diketahui",
-    });
+    next(error);
   }
 };

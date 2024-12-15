@@ -38,8 +38,9 @@ export const createRoomValidation = z.object({
     .min(1, "Deskripsi ruangan harus diisi"),
   mode: z.nativeEnum(LocationMode).default("instance"),
   type: z.nativeEnum(LocationType).default("room"),
-  serviceClass: z.nativeEnum(ServiceClass, {
+  serviceClassId: z.string({
     required_error: "Kelas layanan harus diisi",
+    invalid_type_error: "Kelas layanan harus diisi",
   }),
   installation: z.nativeEnum(Installation, {
     required_error: "Instalasi harus diisi",
@@ -122,7 +123,9 @@ export const updateRoomValidation = z
     description: z.string().min(1, "Deskripsi ruangan harus diisi").optional(),
     mode: z.nativeEnum(LocationMode).optional(),
     type: z.nativeEnum(LocationType).optional(),
-    serviceClass: z.nativeEnum(ServiceClass).optional(),
+    serviceClassId: z.string({
+      invalid_type_error: "Kelas layanan harus diisi",
+    }).optional(),
     installation: z.nativeEnum(Installation).optional(),
     physicalType: z.nativeEnum(PhysicalType).optional(),
     satuSehatId: z.string().optional(),

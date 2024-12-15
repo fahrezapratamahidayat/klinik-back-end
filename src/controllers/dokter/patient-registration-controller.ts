@@ -56,13 +56,7 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
             installation: true,
           },
         },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        Encounter: {
+        encounter: {
           select: {
             id: true,
             status: true,
@@ -189,12 +183,6 @@ export const getPatientRegistrationById = async (
             id: true,
             name: true,
             installation: true,
-          },
-        },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
           },
         },
         createdAt: true,
@@ -359,13 +347,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
             installation: true,
           },
         },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        Encounter: {
+        encounter: {
           select: {
             id: true,
             status: true,
@@ -419,8 +401,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
       },
       doctor: reg.doctor,
       room: reg.room,
-      PaymentMethod: reg.PaymentMethod,
-      Encounter: reg.Encounter,
+      encounter: reg.encounter,
     }));
 
     res.status(200).json({

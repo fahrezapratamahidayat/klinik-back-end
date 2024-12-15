@@ -16,54 +16,93 @@ export const createDoctorValidation = z
     confirmPassword: z
       .string({ required_error: "Konfirmasi password harus diisi" })
       .min(1, "Konfirmasi password harus diisi"),
-    gender: z.nativeEnum(Gender),
-    birthDate: z.coerce.date(),
-    birthPlace: z.string().min(1, "Tempat lahir harus diisi"),
-    nip: z.string().min(1, "NIP harus diisi"),
-    nik: z.string().length(16, "NIK harus 16 digit"),
-    sip: z.string().min(1, "SIP harus diisi"),
-    str: z.string().min(1, "STR harus diisi"),
-    specialization: z.string().min(1, "Spesialisasi harus diisi"),
-    status: z.nativeEnum(DoctorStatus).describe("Status harus diisi"),
-    address: z
-      .object({
-        use: z
-          .string()
-          .min(1, "bisa di isi dengan nilai rumah/kantor/lainnya")
-          .optional(),
-        line: z.string().min(1, "Alamat harus diisi"),
-        city: z.string().min(1, "Kota harus diisi"),
-        postalCode: z.string().min(1, "Kode pos harus diisi"),
-        country: z.string().min(1, "Negara harus diisi"),
-        extension: z.object({
-          provinceCode: z.string().min(1, "Kode provinsi harus diisi"),
-          districtCode: z.string().min(1, "Kode kabupaten harus diisi"),
-          subdistrictCode: z.string().min(1, "Kode kecamatan harus diisi"),
-          villageCode: z.string().min(1, "Kode desa harus diisi"),
-          rt: z.string().optional(),
-          rw: z.string().optional(),
-        }),
+    gender: z.nativeEnum(Gender, {
+      required_error: "Jenis kelamin harus diisi",
+    }),
+    birthDate: z.coerce.date({
+      required_error: "Tanggal lahir harus diisi",
+      invalid_type_error: "Tanggal lahir harus diisi",
+    }),
+    birthPlace: z
+      .string({
+        required_error: "Tempat lahir harus diisi",
+        invalid_type_error: "Tempat lahir harus diisi",
       })
+      .min(1, "Tempat lahir harus diisi"),
+    nip: z
+      .string({
+        required_error: "NIP harus diisi",
+        invalid_type_error: "NIP harus diisi",
+      })
+      .min(1, "NIP harus diisi"),
+    nik: z
+      .string({
+        required_error: "NIK harus 16 digit",
+        invalid_type_error: "NIK harus 16 digit",
+      })
+      .length(16, "NIK harus 16 digit"),
+    sip: z
+      .string({
+        required_error: "SIP harus diisi",
+        invalid_type_error: "SIP harus diisi",
+      })
+      .min(1, "SIP harus diisi"),
+    str: z
+      .string({
+        required_error: "STR harus diisi",
+        invalid_type_error: "STR harus diisi",
+      })
+      .min(1, "STR harus diisi"),
+    specialization: z
+      .string({
+        required_error: "Spesialisasi harus diisi",
+        invalid_type_error: "Spesialisasi harus diisi",
+      })
+      .min(1, "Spesialisasi harus diisi"),
+    consultationFee: z.number(),
+    status: z
+      .nativeEnum(DoctorStatus, {
+        required_error: "Status harus diisi",
+        invalid_type_error: "Status harus diisi",
+      })
+      .describe("Status harus diisi"),
+    address: z
+      .object(
+        {
+          use: z
+            .string()
+            .min(1, "bisa di isi dengan nilai rumah/kantor/lainnya")
+            .optional(),
+          line: z.string().min(1, "Alamat harus diisi"),
+          city: z.string().min(1, "Kota harus diisi"),
+          postalCode: z.string().min(1, "Kode pos harus diisi"),
+          country: z.string().min(1, "Negara harus diisi"),
+          extension: z.object({
+            provinceCode: z.string().min(1, "Kode provinsi harus diisi"),
+            districtCode: z.string().min(1, "Kode kabupaten harus diisi"),
+            subdistrictCode: z.string().min(1, "Kode kecamatan harus diisi"),
+            villageCode: z.string().min(1, "Kode desa harus diisi"),
+            rt: z.string().optional(),
+            rw: z.string().optional(),
+          }),
+        },
+        {
+          required_error: "Alamat dokter harus diisi",
+          invalid_type_error: "Alamat dokter harus diisi",
+        }
+      )
       .describe("Alamat dokter harus diisi"),
-    telecom: z
-      .array(
-        z.object({
-          system: z.string(),
-          value: z.string(),
-          use: z.string(),
-        })
-      )
-      .min(1, "Harus ada setidaknya 1 nomor telepon")
-      .describe("Nomor telepon harus diisi"),
-    workSchedule: z
-      .array(
-        z.object({
-          dayOfWeek: z.number().int().min(1).max(7),
-          startTime: z.string(),
-          endTime: z.string(),
-        })
-      )
-      .optional(),
+    telecom: z.array(
+      z.object({
+        system: z.string(),
+        value: z.string(),
+        use: z.string(),
+      }),
+      {
+        required_error: "Nomor telepon harus diisi",
+        invalid_type_error: "Nomor telepon harus diisi",
+      }
+    ),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Password tidak cocok",
@@ -152,15 +191,6 @@ export const updateDoctorValidation = z
           system: z.string(),
           value: z.string(),
           use: z.string(),
-        })
-      )
-      .optional(),
-    workSchedule: z
-      .array(
-        z.object({
-          dayOfWeek: z.number().int().min(1).max(7),
-          startTime: z.string(),
-          endTime: z.string(),
         })
       )
       .optional(),

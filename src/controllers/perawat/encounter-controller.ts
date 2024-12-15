@@ -1,12 +1,5 @@
-import {
-  EncounterStatus,
-  PrismaClient,
-  RegistrationStatus,
-} from "@prisma/client";
-import { endOfDay, format, parseISO, startOfDay } from "date-fns";
+import { PrismaClient } from "@prisma/client";
 import { Request, Response } from "express";
-import { patientRegistrationStatusSchema } from "../../validations/patient-validation";
-import { id } from "date-fns/locale";
 import { UpdateEncounterSchema } from "../../validations/encounter-validation";
 
 const prisma = new PrismaClient();

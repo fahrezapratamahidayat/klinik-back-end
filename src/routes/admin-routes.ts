@@ -3,6 +3,8 @@ import { createDoctor, deleteDoctor, getDoctorById, getDoctors, updateDoctor } f
 import { createRoom, deleteRoom, getRoomById, getRooms, updateRoom } from "../controllers/admin/room-controller";
 import { createDoctorSchedule,getDoctorSchedules,getDoctorScheduleById, deleteDoctorSchedule, updateDoctorSchedule } from "../controllers/admin/doctor-schedule-controller";
 import { deletePatient, getAllPatients, getPatientById } from "../controllers/admin/patient-controller";
+import servicesClassController from "../controllers/admin/medical-services-controller";
+import ReportController from "../services/report-services"
 
 export const AdminRoutes: Router = Router();
 
@@ -32,3 +34,15 @@ AdminRoutes.get("/doctor-schedule", getDoctorSchedules as RequestHandler);
 AdminRoutes.get("/doctor-schedule/:id", getDoctorScheduleById as RequestHandler);
 AdminRoutes.delete("/doctor-schedule/:id", deleteDoctorSchedule as RequestHandler);
 AdminRoutes.put("/doctor-schedule/:id", updateDoctorSchedule as RequestHandler);
+
+
+// Services Class Routes
+AdminRoutes.post("/services-class", servicesClassController.create as RequestHandler);
+AdminRoutes.get("/services-class", servicesClassController.getAll as RequestHandler);
+AdminRoutes.get("/services-class/:id", servicesClassController.getById as RequestHandler);
+AdminRoutes.put("/services-class/:id", servicesClassController.update as RequestHandler);
+AdminRoutes.delete("/services-class/:id", servicesClassController.delete as RequestHandler);
+
+
+// Report Routes
+AdminRoutes.get("/patient-visit-report", ReportController.getPatientVisitReport as RequestHandler);

@@ -114,7 +114,6 @@ export const createPatientRegistrationValidation = z.object({
   patientId: z.string({ required_error: "Pasien harus diisi" }),
   doctorId: z.string({ required_error: "Dokter harus diisi" }),
   roomId: z.string({ required_error: "Ruangan harus diisi" }),
-  paymentMethodId: z.string({ required_error: "Metode pembayaran harus diisi" }),
   status: z.nativeEnum(RegistrationStatus, { required_error: "Status harus diisi" }).default("draft").optional(),
   scheduleId: z.string({ required_error: "Jadwal harus diisi" }),
   isOnline: z.boolean({ required_error: "Online harus diisi" }),

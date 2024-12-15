@@ -4,10 +4,13 @@ import {
   Gender,
   CitizenshipStatus,
 } from "@prisma/client";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { generateMedicalRecordNumber } from "../../utils/generate";
 import { validateInput } from "../../helpers/validation";
-import { createNewbornPatientValidation, createPatientValidation } from "../../validations/patient-validation";
+import {
+  createNewbornPatientValidation,
+  createPatientValidation,
+} from "../../validations/patient-validation";
 import { endOfDay, parseISO, startOfDay } from "date-fns";
 const prisma = new PrismaClient();
 
@@ -34,21 +37,33 @@ export const createPatient = async (req: Request, res: Response) => {
       responsiblePersonPhone,
     } = req.body;
 
-    if(!validateInput(createPatientValidation, req, res)) return;
+    if (!validateInput(createPatientValidation, req, res)) return;
 
     // Validasi data berdasarkan jenis pasien
     if (identifierType === IdentifierType.tanpa_nik) {
       if (name.length < 3 || !birthDate || !gender) {
         return res
           .status(400)
-          .json({ status: false, statusCode: 400, message: "Data tidak lengkap untuk pasien tanpa NIK" });
+          .json({
+            status: false,
+            statusCode: 400,
+            message: "Data tidak lengkap untuk pasien tanpa NIK",
+          });
       }
     } else if (identifierType === IdentifierType.nik) {
       if (!identifier || identifier.length !== 16) {
-        return res.status(400).json({ status: false, statusCode: 400, message: "NIK tidak valid" });
+        return res
+          .status(400)
+          .json({ status: false, statusCode: 400, message: "NIK tidak valid" });
       }
     } else {
-      return res.status(400).json({ status: false, statusCode: 400, message: "Tipe identifier tidak valid" });
+      return res
+        .status(400)
+        .json({
+          status: false,
+          statusCode: 400,
+          message: "Tipe identifier tidak valid",
+        });
     }
 
     // Check if identifier already exists (hanya untuk pasien dengan NIK)
@@ -60,7 +75,11 @@ export const createPatient = async (req: Request, res: Response) => {
       if (existingPatient) {
         return res
           .status(400)
-          .json({ status: false, statusCode: 400, message: "Pasien dengan NIK tersebut sudah ada" });
+          .json({
+            status: false,
+            statusCode: 400,
+            message: "Pasien dengan NIK tersebut sudah ada",
+          });
       }
     }
     const medicalRecordNumber = await generateMedicalRecordNumber();
@@ -124,11 +143,17 @@ export const createPatient = async (req: Request, res: Response) => {
       message: "Pasien berhasil dibuat",
       data: {
         id: newPatient.id,
-      }
+      },
     });
   } catch (error) {
     console.error("Kesalahan saat membuat pasien:", error);
-    res.status(500).json({status: false, statusCode: 500, message: "Terjadi kesalahan saat membuat pasien" });
+    res
+      .status(500)
+      .json({
+        status: false,
+        statusCode: 500,
+        message: "Terjadi kesalahan saat membuat pasien",
+      });
   }
 };
 
@@ -149,7 +174,7 @@ export const createNewbornPatient = async (req: Request, res: Response) => {
       responsiblePersonPhone,
     } = req.body;
 
-    if(!validateInput(createNewbornPatientValidation, req, res)) return;
+    if (!validateInput(createNewbornPatientValidation, req, res)) return;
 
     // Cari data ibu
     const mother = await prisma.patient.findFirst({
@@ -232,27 +257,45 @@ export const createNewbornPatient = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Kesalahan saat membuat pasien bayi baru lahir:", error);
-    res
-      .status(500)
-      .json({
-        message: "Terjadi kesalahan saat membuat pasien bayi baru lahir",
-      });
+    res.status(500).json({
+      message: "Terjadi kesalahan saat membuat pasien bayi baru lahir",
+    });
   }
 };
 
-export const getAllPatients = async (req: Request, res: Response) => {
+export const getAllPatients = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, all, page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
     let startDate: Date;
     let endDate: Date;
 
     if (from) {
       startDate = startOfDay(parseISO(from as string));
       endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(new Date());
+    } else if (all) {
+      startDate = startOfDay(new Date(2024, 0, 1));
+      endDate = endOfDay(new Date());
     } else {
       startDate = new Date(0);
       endDate = new Date();
     }
+
+    const totalData = await prisma.patient.count({
+      where : {
+        createdAt:{
+          gte: startDate,
+          lte: endDate
+        }
+      }
+    })
+
+    const totalPages = Math.ceil(totalData / Number(limit))
     const patients = await prisma.patient.findMany({
       where: {
         createdAt: {
@@ -311,7 +354,9 @@ export const getAllPatients = async (req: Request, res: Response) => {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: [{ createdAt: "desc" }],
+      skip,
+      take: Number(limit),
+      orderBy: [{ createdAt: "asc" }],
     });
     if (patients.length === 0) {
       return res.status(404).json({
@@ -319,6 +364,12 @@ export const getAllPatients = async (req: Request, res: Response) => {
         statusCode: 404,
         message: "Tidak ada pasien yang ditemukan",
         data: [],
+        pagination: {
+          totalItems: totalData,
+          totalPages,
+          page: Number(page),
+          limit: Number(limit),
+        },
       });
     }
 
@@ -327,6 +378,12 @@ export const getAllPatients = async (req: Request, res: Response) => {
       statusCode: 200,
       message: "Daftar semua pasien berhasil diambil",
       data: patients,
+      pagination: {
+        totalItems: totalData,
+        totalPages,
+        page: Number(page),
+        limit: Number(limit),
+      },
     });
   } catch (error) {
     console.error("Kesalahan saat mengambil daftar pasien:", error);
@@ -353,21 +410,25 @@ export const getPatientById = async (req: Request, res: Response) => {
                 rw: true,
                 province: {
                   select: {
+                    code: true,
                     name: true,
                   },
                 },
                 district: {
                   select: {
+                    code: true,
                     name: true,
                   },
                 },
                 subdistrict: {
                   select: {
+                    code: true,
                     name: true,
                   },
                 },
                 village: {
                   select: {
+                    code: true,
                     name: true,
                   },
                 },
@@ -419,7 +480,7 @@ export const deletePatient = async (req: Request, res: Response) => {
       status: false,
       statusCode: 500,
       message: "Terjadi kesalahan saat menghapus pasien",
-      errors: error.message
+      errors: error.message,
     });
   }
-}
+};

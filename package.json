@@ -23,6 +23,7 @@
     "express": "^4.21.0",
     "i": "^0.3.7",
     "jsonwebtoken": "^9.0.2",
+    "midtrans-client": "^1.4.2",
     "npm": "^10.9.0",
     "pino": "^9.4.0",
     "pino-pretty": "^11.2.2",

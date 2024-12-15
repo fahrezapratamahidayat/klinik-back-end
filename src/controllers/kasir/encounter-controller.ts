@@ -138,6 +138,7 @@ export const getEncounterPatientRegistrationById = async (
         },
       },
       prescriptions: true,
+      payment: true,
       encounterTimeline: true,
       createdAt: true,
       updatedAt: true,

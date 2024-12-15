@@ -1,23 +1,40 @@
-import { EncounterStatus, PrismaClient, RegistrationStatus } from "@prisma/client";
+import { EncounterStatus, RegistrationStatus } from "@prisma/client";
 import { Request, Response, NextFunction } from "express";
 import { startOfDay, endOfDay, parseISO, format } from "date-fns";
 import { id } from "date-fns/locale";
 import { patientRegistrationStatusSchema } from "../../validations/patient-validation";
-const prisma = new PrismaClient();
+import prisma from "../../lib/prisma";
 
-export const getPatientRegistration = async (req: Request, res: Response) => {
+export const getPatientRegistration = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, all, page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
     let startDate: Date;
     let endDate: Date;
 
     if (from) {
       startDate = startOfDay(parseISO(from as string));
       endDate = to ? endOfDay(parseISO(to as string)) : endOfDay(new Date());
+    } else if (all) {
+      startDate = startOfDay(new Date(2024, 0, 1));
+      endDate = endOfDay(new Date());
     } else {
       startDate = new Date(0);
       endDate = new Date();
     }
+
+    // ambil total pagination
+    const totalData = await prisma.patientRegistration.count({
+      where: {
+        registrationDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+        status: { in: ["antrian_kasir", "dalam_antrian_kasir"] },
+      },
+    });
+
     const patientRegistration = await prisma.patientRegistration.findMany({
       where: {
         status: { in: ["antrian_kasir", "dalam_antrian_kasir"] },
@@ -55,13 +72,7 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
             installation: true,
           },
         },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        Encounter: {
+        encounter: {
           select: {
             id: true,
             status: true,
@@ -70,7 +81,12 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
         createdAt: true,
         updatedAt: true,
       },
+      skip,
+      take: Number(limit),
+      orderBy: [{ registrationDate: "desc" }, { queueNumber: "asc" }],
     });
+
+    const totalPages = Math.ceil(totalData / Number(limit));
 
     if (patientRegistration.length === 0) {
       return res.status(404).json({
@@ -78,6 +94,12 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
         statusCode: 404,
         message: "Data tidak ditemukan",
         data: [],
+        pagination: {
+          totalItems: totalData,
+          totalPages,
+          page: Number(page),
+          limit: Number(limit),
+        },
       });
     }
 
@@ -86,15 +108,15 @@ export const getPatientRegistration = async (req: Request, res: Response) => {
       statusCode: 200,
       message: "Berhasil mengambil data pasien dalam antrian",
       data: patientRegistration,
+      pagination: {
+        totalItems: totalData,
+        totalPages,
+        page: Number(page),
+        limit: Number(limit)
+      }
     });
   } catch (error) {
-    res.status(500).json({
-      status: false,
-      statusCode: 500,
-      message: "Gagal mengambil data pasien dalam antrian",
-      data: [],
-      error: error,
-    });
+    next()
   }
 };
 
@@ -188,12 +210,6 @@ export const getPatientRegistrationById = async (
             id: true,
             name: true,
             installation: true,
-          },
-        },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
           },
         },
         createdAt: true,
@@ -358,13 +374,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
             installation: true,
           },
         },
-        PaymentMethod: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        Encounter: {
+        encounter: {
           select: {
             id: true,
             status: true,
@@ -418,8 +428,7 @@ export const getQueueInfo = async (req: Request, res: Response) => {
       },
       doctor: reg.doctor,
       room: reg.room,
-      PaymentMethod: reg.PaymentMethod,
-      Encounter: reg.Encounter,
+      encounter: reg.encounter,
     }));
 
     res.status(200).json({

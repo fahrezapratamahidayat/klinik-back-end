@@ -134,24 +134,25 @@ export async function generateMedicineCode(): Promise<string> {
 
 export async function generatePrescriptionNumber(): Promise<string> {
   try {
-    const lastPrescription = await prisma.prescriptions.findFirst({
-      orderBy: {
-        prescriptionNumber: "desc",
-      },
-      select: {
-        prescriptionNumber: true,
-      },
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const timestamp = date.getTime().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    const prescriptionNumber = `RX-${year}${month}${day}-${timestamp}${random}`;
+    
+    // Verifikasi keunikan
+    const exists = await prisma.prescriptions.findUnique({
+      where: { prescriptionNumber },
     });
-
-    let nextNumber = 1;
-
-    if (lastPrescription && lastPrescription.prescriptionNumber) {
-      const lastNumber = parseInt(lastPrescription.prescriptionNumber.slice(3));
-      nextNumber = lastNumber + 1;
+    
+    if (exists) {
+      // Jika masih ada duplikasi, generate ulang
+      return generatePrescriptionNumber();
     }
-
-    const prescriptionNumber = `RX-${nextNumber.toString().padStart(6, "0")}`;
-
+    
     return prescriptionNumber;
   } catch (error) {
     console.error("Kesalahan saat membuat nomor resep:", error);

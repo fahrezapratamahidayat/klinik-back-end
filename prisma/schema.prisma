@@ -119,14 +119,14 @@ enum RoomStatus {
   suspended /// Ruangan ditangguhkan penggunaannya
 }
 
-enum ServiceClass {
-  vvip /// Very Important Person (Orang Penting)
-  vip /// Important Person (Orang Penting)
-  kelas_1 /// Kelas 1
-  kelas_2 /// Kelas 2
-  kelas_3 /// Kelas 3
-  non_kelas /// Untuk ruangan tanpa klasifikasi kelas
-}
+// enum ServiceClass {
+//   vvip /// Very Important Person (Orang Penting)
+//   vip /// Important Person (Orang Penting)
+//   kelas_1 /// Kelas 1
+//   kelas_2 /// Kelas 2
+//   kelas_3 /// Kelas 3
+//   non_kelas /// Untuk ruangan tanpa klasifikasi kelas
+// }
 
 enum Installation {
   rawat_inap /// Rawat Inap
@@ -284,18 +284,46 @@ enum DiagnosisType {
   differential /// Diagnosa banding
 }
 
-model User {
-  id           String    @id @default(uuid())
-  username     String    @unique
-  email        String    @unique
+enum AccountType {
+  STAFF /// Untuk pegawai internal (pendaftaran, farmasi, kasir dll)
+  DOCTOR /// Untuk dokter
+  PATIENT /// Untuk pasien
+}
+
+model Account {
+  id           String      @id @default(uuid())
+  username     String      @unique
+  email        String      @unique
   password     String
+  type         AccountType
   role         UserRole
-  isActive     Boolean   @default(true)
+  isActive     Boolean     @default(true)
   lastLoginAt  DateTime?
   refreshToken String?
-  doctor       Doctor?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  doctor       Doctor?     @relation("AccountDoctor") // Tambahkan nama relasi
+  staff        Staff?      @relation("AccountStaff")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  createdBy    String?
+  updatedBy    String?
+
+  @@index([type])
+  @@map("accounts")
+}
+
+model Staff {
+  id        String   @id @default(uuid())
+  accountId String   @unique
+  account   Account  @relation("AccountStaff", fields: [accountId], references: [id], onDelete: Cascade)
+  nip       String   @unique
+  name      String
+  position  UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@map("staffs")
 }
 
 model Encounter {
@@ -317,7 +345,7 @@ model Encounter {
   prescriptions            Prescriptions[]
   diagnosis                Diagnosis[]
   procedure                Procedure[]
-  Payment                  Payment?
+  payment                  Payment?
 }
 
 model EncounterTimeline {
@@ -618,6 +646,9 @@ enum PaymentStatus {
   paid
   cancelled
   refunded
+  challenge
+  deny
+  expire
 }
 
 enum PaymentType {
@@ -625,6 +656,7 @@ enum PaymentType {
   consultation
   procedure
   other
+  serviceClass
 }
 
 model Payment {
@@ -632,19 +664,23 @@ model Payment {
   paymentNumber   String          @unique
   encounterId     String          @unique
   encounter       Encounter       @relation(fields: [encounterId], references: [id], onDelete: Cascade)
-  paymentMethodId String
-  paymentMethod   PaymentMethod   @relation(fields: [paymentMethodId], references: [id])
+  firstName       String
+  lastName        String
+  email           String
+  phone           String
+  midtransOrderId String?         @unique
+  midtransToken   String?
+  paymentUrl      String?
   totalAmount     Float
   paymentStatus   PaymentStatus   @default(pending)
   paidAt          DateTime?
   paidBy          String?
   notes           String?
-  PaymentDetail   PaymentDetail[]
+  paymentDetail   PaymentDetail[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   @@index([encounterId])
-  @@index([paymentMethodId])
 }
 
 model PaymentDetail {
@@ -665,8 +701,8 @@ model PaymentDetail {
 
 model Doctor {
   id                  String                @id @default(uuid())
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId              String                @unique
+  accountId           String                @unique
+  account             Account               @relation("AccountDoctor", fields: [accountId], references: [id], onDelete: Cascade)
   name                String
   gender              Gender
   birthDate           DateTime
@@ -678,6 +714,7 @@ model Doctor {
   bpjsCode            String?               @unique
   satuSehatId         String?               @unique
   specialization      String
+  consultationFee     Float
   status              DoctorStatus          @default(aktif)
   address             Address               @relation(fields: [addressId], references: [id], onDelete: Cascade)
   addressId           String                @unique
@@ -688,17 +725,14 @@ model Doctor {
   updatedAt           DateTime              @updatedAt
 }
 
-model Organization {
-  id        String    @id @default(uuid())
-  name      String
-  type      String?
-  alias     String?
-  telecom   Telecom[]
-  address   Address?  @relation(fields: [addressId], references: [id])
-  addressId String?   @unique
-  rooms     Room[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+model ServiceClass {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  price       Float
+  Room        Room[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Room {
@@ -713,7 +747,8 @@ model Room {
   description            String
   mode                   LocationMode          @default(instance)
   type                   LocationType          @default(room)
-  serviceClass           ServiceClass
+  serviceClassId         String
+  serviceClass           ServiceClass          @relation(fields: [serviceClassId], references: [id])
   installation           Installation
   telecom                Telecom[]
   physicalType           PhysicalType          @default(ro)
@@ -724,8 +759,6 @@ model Room {
   altitude               Float?
   Tindakan               Tindakan[]
   HoursOfOperation       HoursOfOperation[]
-  managingOrganization   Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  organizationId         String?
   address                Address?              @relation(fields: [addressId], references: [id], onDelete: Cascade)
   addressId              String?               @unique
   doctorSchedule         DoctorSchedule[]
@@ -848,11 +881,9 @@ model PatientRegistration {
   doctor             Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   roomId             String
   room               Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  paymentMethodId    String
-  PaymentMethod      PaymentMethod?     @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
   registrationDate   DateTime
   status             RegistrationStatus @default(draft)
-  Encounter          Encounter?
+  encounter          Encounter?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
@@ -884,7 +915,6 @@ model Address {
   patient       Patient?
   RelatedPerson RelatedPerson?
   Doctor        Doctor?
-  Organization  Organization?
   Room          Room?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -920,21 +950,8 @@ model Telecom {
   doctorId        String?
   Room            Room?          @relation(fields: [roomId], references: [id], onDelete: Cascade)
   roomId          String?
-  Organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  organizationId  String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-}
-
-model PaymentMethod {
-  id                   String                @id @default(uuid())
-  name                 String                @unique
-  description          String?
-  isActive             Boolean               @default(true)
-  patientRegistrations PatientRegistration[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  Payment              Payment[]
 }
 
 model Province {
