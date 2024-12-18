@@ -7,5 +7,4 @@ node_modules
 .env.test
 
 prisma/migrations
-dist
 .vercel
