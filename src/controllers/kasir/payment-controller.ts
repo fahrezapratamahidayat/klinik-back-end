@@ -339,6 +339,8 @@ export const createPaymentWithMidtrans = async (
       },
     ];
 
+    console.log(paymentDetails);
+
     // Buat order ID unik
     const orderId = `ORDER-${Date.now()}`;
 
@@ -354,12 +356,32 @@ export const createPaymentWithMidtrans = async (
         email,
         phone,
       },
-      item_details: paymentDetails.map((item) => ({
-        id: item.itemId,
-        price: Math.round(item.price),
-        quantity: item.quantity,
-        name: item.notes,
-      })),
+      item_details: paymentDetails.map((item) => {
+        let shortName = "";
+        switch (item.itemType) {
+          case "medicine":
+            shortName = `Obat: ${item.notes.split(': ')[1].substring(0, 20)}`;
+            break;
+          case 'procedure':
+            shortName = `Tindakan: ${item.notes.split(': ')[1].substring(0, 20)}`;
+            break;
+          case 'consultation':
+            shortName = `Konsul: ${item.notes.split('Dokter ')[1].substring(0, 20)}`;
+            break;
+          case 'serviceClass':
+            shortName = `Ruangan ${item.notes.split('Ruangan - ')[1].substring(0, 20)}`;
+            break;
+          default:
+            shortName = item.notes.substring(0, 20);
+        }
+    
+        return {
+          id: item.itemId,
+          price: Math.round(item.price),
+          quantity: item.quantity,
+          name: shortName,
+        };
+      }),
       callbacks: {
         finish: `${process.env.FRONTEND_URL}/kasir/transaction?registration_id=${patientRegistrationId}`,
         error: `${process.env.FRONTEND_URL}/kasir/transaction?registration_id=${patientRegistrationId}`,
@@ -440,6 +462,7 @@ export const createPaymentWithMidtrans = async (
       },
     });
   } catch (error: any) {
+    console.log(error);
     next(error);
   }
 };
