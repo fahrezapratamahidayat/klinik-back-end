@@ -462,7 +462,6 @@ export const createPaymentWithMidtrans = async (
       },
     });
   } catch (error: any) {
-    console.log(error);
     next(error);
   }
 };
