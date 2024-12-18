@@ -26,5 +26,12 @@ routes(app);
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  logger.info(`Server running on port http://localhost:${PORT} in ${envFile} mode`);
+  logger.info(`Server running on port ${PORT} in ${envFile} mode`);
 });
+
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-frontend-domain.com'] 
+    : 'http://localhost:3000',
+  credentials: true
+}));
