@@ -1,39 +1,60 @@
-import express, { Application } from 'express';
+import express from 'express';
 import bodyParser from 'body-parser';
-import { routes } from '../src/routes';
-import { logger } from '../src/utils/logger';
-import * as dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
-import { errorHandler } from '../src/utils/error-handler';
-const app: Application = express();
+import dotenv from 'dotenv';
+import { routes } from './routes';
+import { errorHandler } from './utils/error-handler';
+import { safeLogger } from './utils/logger';
 
-app.use(bodyParser.urlencoded({ extended: false }));
+dotenv.config();
+
+const app = express();
+
+// Middleware
 app.use(bodyParser.json());
-app.use(express.json());
-
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: (origin, callback) => {
+    const allowedOrigins = ['https://klinik-front-end.vercel.app'];
+    if (process.env.NODE_ENV !== 'production') {
+      allowedOrigins.push('http://localhost:3000');
+    }
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-const envFile = `.env.${process.env.NODE_ENV || 'local'}`;
-dotenv.config({ path: envFile });
-
-const PORT = process.env.PORT || 5173;
-
+// Routes
 routes(app);
+
+// Error handling middleware
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT} in ${envFile} mode`);
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  safeLogger.error('Uncaught Exception:', err);
 });
 
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-frontend-domain.com'] 
-    : 'http://localhost:3000',
-  credentials: true
-}));
-// export api to vercel
-module.exports = app;
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  safeLogger.error('Unhandled Rejection:', err);
+});
+
+const port = process.env.PORT || 3000;
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    safeLogger.info(`Server is running on port ${port}`);
+  });
+}
+
+safeLogger.info(`Node Environment: ${process.env.NODE_ENV}`);
+
+export default app;

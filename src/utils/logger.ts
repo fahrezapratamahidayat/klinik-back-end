@@ -1,14 +1,37 @@
-import pino from "pino";
-import pretty from 'pino-pretty'
-import { format } from "date-fns"
+import pino from 'pino';
 
+const logger = pino({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+});
 
-export const logger = pino({
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true
-        }
-    },
-    timestamp: () => `,"time":"${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}"`
-})
+// Simple logger interface
+export const safeLogger = {
+  info: (...args: any[]) => {
+    try {
+      logger.info(args);
+    } catch {
+      console.log(...args);
+    }
+  },
+  error: (...args: any[]) => {
+    try {
+      logger.error(args);
+    } catch {
+      console.error(...args);
+    }
+  },
+  warn: (...args: any[]) => {
+    try {
+      logger.warn(args);
+    } catch {
+      console.warn(...args);
+    }
+  },
+  debug: (...args: any[]) => {
+    try {
+      logger.debug(args);
+    } catch {
+      console.debug(...args);
+    }
+  }
+};
