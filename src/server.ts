@@ -1,11 +1,11 @@
 import express, { Application } from 'express';
 import bodyParser from 'body-parser';
-import { routes } from './src/routes';
-import { logger } from './src/utils/logger';
+import { routes } from '../src/routes';
+import { logger } from '../src/utils/logger';
 import * as dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
-import { errorHandler } from './src/utils/error-handler';
+import { errorHandler } from '../src/utils/error-handler';
 const app: Application = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -35,3 +35,5 @@ app.use(cors({
     : 'http://localhost:3000',
   credentials: true
 }));
+// export api to vercel
+module.exports = app;
